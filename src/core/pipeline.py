@@ -659,6 +659,7 @@ class StockAnalysisPipeline:
                     daily_market_context=daily_market_context,
                     portfolio_context=portfolio_context,
                     market_structure_context=market_structure_context,
+                    company_reports_analysis_text=company_reports_analysis_text,
                 )
 
             # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
@@ -1542,6 +1543,7 @@ class StockAnalysisPipeline:
         daily_market_context: DailyMarketContext | None = None,
         portfolio_context: dict[str, Any] | None = None,
         market_structure_context: dict[str, Any] | None = None,
+        company_reports_analysis_text: str = "",
     ) -> AnalysisResult | None:
         """
         使用 Agent 模式分析单只股票。
