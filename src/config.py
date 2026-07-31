@@ -1189,7 +1189,7 @@ class Config:
     # 拉取的 10-Q 数量（1-8 之间由代码 clamp）
     company_reports_filing_count: int = 4
     # 交给 LLM 生成分析块的最大 token 数
-    company_reports_llm_max_tokens: int = 1500
+    company_reports_llm_max_tokens: int = 4000
     # 单次 SEC 拉取整体超时（秒）
     company_reports_fetch_timeout_seconds: float = 20.0
 
@@ -2447,7 +2447,7 @@ class Config:
             ),
             company_reports_llm_max_tokens=parse_env_int(
                 os.getenv("COMPANY_REPORTS_LLM_MAX_TOKENS"),
-                1500,
+                4000,
                 field_name="COMPANY_REPORTS_LLM_MAX_TOKENS",
                 minimum=256,
                 maximum=8192,
