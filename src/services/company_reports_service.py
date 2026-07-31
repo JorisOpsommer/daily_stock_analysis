@@ -40,6 +40,10 @@ _INCOME_STATEMENT_CONCEPTS: list[str] = [
     "SellingGeneralAndAdministrativeExpense",
     "InterestExpense",
     "DepreciationAndAmortization",
+    # Pretax income + tax expense enable effective-tax-rate and NOPAT/ROIC math,
+    # which are core Buffett-style capital-return metrics.
+    "IncomeLossBeforeIncomeTaxes",
+    "IncomeTaxExpenseBenefit",
     "NetIncomeLoss",
     "EarningsPerShareBasic",
     "EarningsPerShareDiluted",
@@ -56,6 +60,7 @@ _BALANCE_SHEET_CONCEPTS: list[str] = [
     "Goodwill",
     "IntangibleAssetsNetExcludingGoodwill",
     "PropertyPlantAndEquipmentNet",
+    "AccountsPayableCurrent",
     "CurrentLiabilities",
     "LongTermDebt",
     "LongTermDebtNoncurrent",
@@ -73,6 +78,9 @@ _CASHFLOW_CONCEPTS: list[str] = [
     "NetCashProvidedByUsedInFinancingActivities",
     "PaymentsToAcquirePropertyPlantAndEquipment",
     "DepreciationDepletionAndAmortization",
+    # Buffett treats share-based compensation as a real cash-equivalent expense;
+    # exposing it lets the analyzer flag "cosmetic" earnings.
+    "ShareBasedCompensation",
     "PaymentsForRepurchaseOfCommonStock",
     "PaymentsOfDividendsCommonStock",
 ]
@@ -617,6 +625,23 @@ _ALIAS_MAP: dict[str, list[str]] = {
         "ProfitLoss",
         "NetIncomeLossAvailableToCommonStockholdersBasic",
     ],
+    "IncomeLossBeforeIncomeTaxes": [
+        # Formal XBRL tags for pre-tax income vary widely across filers.
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterest",
+        "IncomeBeforeIncomeTaxes",
+        "IncomeLossBeforeIncomeTaxes",
+        "IncomeLossFromContinuingOperationsBeforeIncomeTaxes",
+        "PretaxIncome",
+        "IncomeBeforeTax",
+    ],
+    "IncomeTaxExpenseBenefit": [
+        "IncomeTaxExpenseBenefit",
+        "IncomeTaxExpense",
+        "IncomeTaxesPaid",
+        "ProvisionForIncomeTaxes",
+    ],
     "LongTermDebt": [
         "LongTermDebt",
         "LongTermDebtNoncurrent",
@@ -650,6 +675,12 @@ _ALIAS_MAP: dict[str, list[str]] = {
         "InventoryNet",
         "Inventories",
         "InventoryFinishedGoods",
+    ],
+    "AccountsPayableCurrent": [
+        "AccountsPayableCurrent",
+        "AccountsPayable",
+        "AccountsPayableTradeCurrent",
+        "TradeAndOtherPayablesCurrent",
     ],
     "Assets": ["Assets"],
     "CurrentAssets": ["CurrentAssets", "AssetsCurrent", "CurrentAssetsTotal"],
@@ -716,6 +747,12 @@ _ALIAS_MAP: dict[str, list[str]] = {
         "DepreciationDepletionAndAmortization",
         "DepreciationAndAmortization",
         "DepreciationExpense",
+    ],
+    "ShareBasedCompensation": [
+        "ShareBasedCompensation",
+        "StockBasedCompensation",
+        "ShareBasedPaymentArrangementNoncashExpense",
+        "AllocatedShareBasedCompensationExpense",
     ],
     "PaymentsForRepurchaseOfCommonStock": [
         "PaymentsForRepurchaseOfCommonStock",
