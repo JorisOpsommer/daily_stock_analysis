@@ -2411,12 +2411,31 @@ class NotificationService(
         "CNH": "元",
         "TWD": "新台币",  # 台股 (TWSE/TPEx) 以新台币计价，避免与 A 股「元」(人民币) 混淆
     }
+    _EN_CURRENCY_CODE = {
+        "USD": "USD",
+        "HKD": "HKD",
+        "CNY": "CNY",
+        "RMB": "CNY",
+        "CNH": "CNY",
+        "TWD": "TWD",
+    }
 
     @classmethod
-    def _format_amount_cn(cls, value: Any, currency: str | None = None) -> str:
+    def _currency_code(cls, currency: str | None, language: str | None) -> str:
+        """Return the display currency unit for the given report language."""
+        normalized = (currency or "").upper()
+        if language == "en":
+            return cls._EN_CURRENCY_CODE.get(normalized) or normalized or "USD"
+        return cls._CURRENCY_SUFFIX.get(normalized, "元")
+
+    @classmethod
+    def _format_amount_cn(
+        cls, value: Any, currency: str | None = None, language: str | None = None
+    ) -> str:
         """Format absolute amounts in 亿/万 + currency suffix; returns N/A on non-numeric.
 
         ``currency`` accepts ``USD``/``HKD``/``CNY``; unknown values fall back to 元.
+        ``language`` ("en") switches to B/M/K + ISO currency codes.
         """
         try:
             amount = float(value)
@@ -2426,6 +2445,15 @@ class NotificationService(
             return "N/A"
         sign = "-" if amount < 0 else ""
         abs_amount = abs(amount)
+        if language == "en":
+            code = cls._currency_code(currency, "en")
+            if abs_amount >= 1e9:
+                return f"{sign}{abs_amount / 1e9:.2f}B {code}"
+            if abs_amount >= 1e6:
+                return f"{sign}{abs_amount / 1e6:.2f}M {code}"
+            if abs_amount >= 1e3:
+                return f"{sign}{abs_amount / 1e3:.2f}K {code}"
+            return f"{sign}{abs_amount:.0f} {code}"
         suffix = cls._CURRENCY_SUFFIX.get((currency or "").upper(), "元")
         if abs_amount >= 1e8:
             return f"{sign}{abs_amount / 1e8:.2f} 亿{suffix}"
@@ -2441,15 +2469,17 @@ class NotificationService(
             return "N/A"
 
     @classmethod
-    def _format_per_share(cls, value: Any, currency: str | None = None) -> str:
+    def _format_per_share(
+        cls, value: Any, currency: str | None = None, language: str | None = None
+    ) -> str:
         try:
             amount = float(value)
         except (TypeError, ValueError):
             return "N/A"
         if amount != amount:  # NaN
             return "N/A"
-        suffix = cls._CURRENCY_SUFFIX.get((currency or "").upper(), "元")
-        return f"{amount:.4f} {suffix}"
+        unit = cls._currency_code(currency, language)
+        return f"{amount:.4f} {unit}"
 
     @staticmethod
     def _format_text(value: Any) -> str:
@@ -2587,9 +2617,9 @@ class NotificationService(
         report_language = self._get_report_language(result)
         labels = get_report_labels(report_language)
 
-        self._append_financial_summary(lines, blocks, labels)
+        self._append_financial_summary(lines, blocks, labels, report_language)
         self._append_company_reports_block(lines, result, labels)
-        self._append_shareholder_return(lines, blocks, labels)
+        self._append_shareholder_return(lines, blocks, labels, report_language)
         self._append_institutional_flow(lines, blocks, labels)
         self._append_related_boards(lines, blocks, labels)
 
@@ -2598,6 +2628,7 @@ class NotificationService(
         lines: list[str],
         blocks: dict[str, Any],
         labels: dict[str, str],
+        report_language: str | None = None,
     ) -> None:
         report = blocks.get("financial_report") or {}
         growth = blocks.get("growth") or {}
@@ -2606,12 +2637,14 @@ class NotificationService(
         )
         cells = {
             "report_date": self._format_text(report.get("report_date")),
-            "revenue": self._format_amount_cn(report.get("revenue"), currency),
+            "revenue": self._format_amount_cn(
+                report.get("revenue"), currency, report_language
+            ),
             "net_profit": self._format_amount_cn(
-                report.get("net_profit_parent"), currency
+                report.get("net_profit_parent"), currency, report_language
             ),
             "operating_cash_flow": self._format_amount_cn(
-                report.get("operating_cash_flow"), currency
+                report.get("operating_cash_flow"), currency, report_language
             ),
             "roe": self._format_percent(
                 report.get("roe")
@@ -2677,6 +2710,7 @@ class NotificationService(
         lines: list[str],
         blocks: dict[str, Any],
         labels: dict[str, str],
+        report_language: str | None = None,
     ) -> None:
         dividend = blocks.get("dividend") or {}
         report = blocks.get("financial_report") or {}
@@ -2704,7 +2738,9 @@ class NotificationService(
         ttm_event_count = dividend.get("ttm_event_count")
         cells = {
             "ttm_cash": self._format_per_share(
-                dividend.get("ttm_cash_dividend_per_share"), dividend_currency
+                dividend.get("ttm_cash_dividend_per_share"),
+                dividend_currency,
+                report_language,
             ),
             "ttm_count": str(ttm_event_count)
             if isinstance(ttm_event_count, int)

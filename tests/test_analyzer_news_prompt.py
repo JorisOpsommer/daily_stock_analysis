@@ -105,6 +105,48 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
         self.assertNotIn("专注于趋势交易", prompt)
         self.assertNotIn("多头排列：MA5 > MA10 > MA20", prompt)
 
+    def test_analysis_prompt_uses_english_json_schema_when_report_language_is_en(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+
+        prompt = analyzer._get_analysis_system_prompt("en", stock_code="GME")
+
+        self.assertIn('"watch_conditions": ["Watch condition 1"', prompt)
+        self.assertIn("Risk point 1: specific description", prompt)
+        self.assertIn('"one_sentence": "One-sentence core conclusion', prompt)
+        self.assertIn("## Scoring Criteria", prompt)
+        self.assertIn("## Decision Dashboard Core Principles", prompt)
+        self.assertIn("## Actionability and Stability Constraints", prompt)
+        self.assertNotIn("观察条件1", prompt)
+        self.assertNotIn("风险点1：具体描述", prompt)
+        self.assertNotIn("评分标准", prompt)
+        self.assertNotIn("可操作性与稳定性约束", prompt)
+
+    def test_analysis_prompt_keeps_chinese_json_schema_when_report_language_is_zh(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer()
+
+        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+
+        self.assertIn("观察条件1", prompt)
+        self.assertIn("风险点1：具体描述", prompt)
+        self.assertIn("评分标准", prompt)
+        self.assertIn("可操作性与稳定性约束", prompt)
+        self.assertNotIn('"watch_conditions": ["Watch condition 1"', prompt)
+
+    def test_analysis_prompt_uses_english_json_schema_for_legacy_prompt_when_en(self) -> None:
+        with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
+            analyzer = GeminiAnalyzer(use_legacy_default_prompt=True)
+
+        prompt = analyzer._get_analysis_system_prompt("en", stock_code="GME")
+
+        self.assertIn('"watch_conditions": ["Watch condition 1"', prompt)
+        self.assertIn("Ideal entry: XX", prompt)
+        self.assertIn("## Scoring Criteria", prompt)
+        self.assertNotIn("观察条件1", prompt)
+        self.assertNotIn("评分标准", prompt)
+
+
     def test_analysis_prompt_keeps_injected_default_policy_for_implicit_default_run(self) -> None:
         with patch.object(GeminiAnalyzer, "_init_litellm", return_value=None):
             analyzer = GeminiAnalyzer(

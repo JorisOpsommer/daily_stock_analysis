@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] 决策仪表盘基础 prompt 整体随 `report_language` 本地化：`en`/`ko` 下内嵌 JSON schema 示例块、评分标准、核心原则与可操作性/稳定性约束整段改为英文（如 `watch_conditions: ["Watch condition 1"]`、`risk_alerts: ["Risk point 1: specific description"]`、`## Scoring Criteria`、`## Actionability and Stability Constraints`），`zh` 保持原有中文措辞字节不变；修复此前即便 `REPORT_LANGUAGE=en` 追加英文输出指令，模型仍会在 risk_alerts / sentiment_summary / core_conclusion / battle_plan / phase_decision 等自由文本字段输出中文的口径漂移问题。
+- [修复] 通知消息中 💼 财务摘要 与 💵 股东回报 的金额/每股货币单位改为随 `report_language` 本地化：`en` 下使用 `835.30M USD` / `0.0000 USD` 等 B/M/K + ISO 货币代码，`zh`/`ko` 维持原有 亿/万 + 汉字货币后缀；此前无论语言设置均硬编码中文货币单位（美元/港元/元）。
 - [改进] `company_reports_analyzer` 重写为巴菲特级尽调备忘录：新增 ROE / ROA / ROIC（年化）、Owner Earnings（1986 伯克希尔股东信定义）、利息覆盖倍数、流动/速动比率、有效税率、每股账面价值与 CAGR 等指标要求，并明确禁止 LaTeX 转义（\( \% \$）以修复下游 Markdown/KaTeX 渲染出现 `\(2025-05\)` 的问题；同步在 `company_reports_service` 中扩展抽取的 XBRL 字段（税前利润、所得税、应付账款、股票薪酬）与对应别名，中英韩三语 prompt 结构一致。
 - [新功能] SkillAggregator 基于独立满足 30 条 evaluated 门槛的真实 Skill Outcome bucket，使用 Beta 先验收缩、unable 惩罚和多周期证据加权生成有界运行时权重；缺失、低样本或异常统计保持中性。
 - [修复] Outcome 候选按上次尝试时间公平调度，避免持续新增的缺失 key 使旧 `pending` outcome 永久得不到重试。

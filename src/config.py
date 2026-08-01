@@ -494,7 +494,6 @@ def normalize_llm_channel_model(
                 "cerebras",
                 "fireworks_ai",
                 "friendliai",
-                "openrouter",
             }
         )
         if prefix in known_providers:
