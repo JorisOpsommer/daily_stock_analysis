@@ -4468,6 +4468,12 @@ class GeminiAnalyzer:
                 _emit_progress(parse_progress, f"{name}：LLM 返回完成，正在解析 JSON")
 
                 # 解析响应
+                if not response_text or not response_text.strip():
+                    logger.warning(
+                        "[LLM解析] %s(%s) 响应为空，将解析为默认结果（可能导致通知内容异常）",
+                        name,
+                        code,
+                    )
                 result = self._parse_response(response_text, code, name)
                 result.raw_response = response_text
                 result.search_performed = bool(news_context)
@@ -4475,6 +4481,20 @@ class GeminiAnalyzer:
                 result.model_used = model_used
                 result.report_language = report_language
                 normalize_chip_structure_availability(result, context.get("chip"))
+
+                logger.info(
+                    "[LLM解析] %s(%s) 解析结果: success=%s, decision_type=%s, "
+                    "action=%s, 评分=%s, model=%s, raw_len=%d, prompt_len=%d",
+                    name,
+                    code,
+                    getattr(result, "success", None),
+                    getattr(result, "decision_type", None),
+                    getattr(result, "action", None),
+                    getattr(result, "sentiment_score", None),
+                    model_used,
+                    len(response_text or ""),
+                    len(current_prompt or ""),
+                )
 
                 # 内容完整性校验（可选）
                 if not config.report_integrity_enabled:
@@ -4521,6 +4541,15 @@ class GeminiAnalyzer:
 
             logger.info(
                 f"[LLM解析] {name}({code}) 分析完成: {result.trend_prediction}, 评分 {result.sentiment_score}"
+            )
+            logger.info(
+                "[Telegram] 分析结果 %s(%s) 已生成并准备交给报告/通知阶段 "
+                "(success=%s, decision_type=%s, has_dashboard=%s)",
+                name,
+                code,
+                getattr(result, "success", None),
+                getattr(result, "decision_type", None),
+                isinstance(getattr(result, "dashboard", None), dict),
             )
 
             return result
@@ -5466,6 +5495,12 @@ class GeminiAnalyzer:
             try:
                 _json_str, data = self._extract_analysis_json_object(response_text)
                 self._validate_analysis_minimal_contract(data)
+                logger.info(
+                    "[LLM解析] %s(%s) 成功提取 JSON (raw_len=%d)",
+                    name,
+                    code,
+                    len(response_text or ""),
+                )
             except Exception as exc:
                 logger.warning("无法从响应中提取唯一有效 JSON，标记为解析失败: %s", exc)
                 return self._parse_text_response(response_text, code, name)

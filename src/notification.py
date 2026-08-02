@@ -3007,6 +3007,17 @@ class NotificationService(
         if channel == NotificationChannel.DINGTALK:
             return self.send_to_dingtalk(content)
         if channel == NotificationChannel.TELEGRAM:
+            has_token = bool(getattr(self._config, "telegram_bot_token", None))
+            has_chat_id = bool(getattr(self._config, "telegram_chat_id", None))
+            logger.info(
+                "[Telegram] 进入 telegram 发送分支 (configured_token=%s, "
+                "configured_chat_id=%s, mode=%s, route=%s, content_len=%d)",
+                has_token,
+                has_chat_id,
+                "image" if use_image else "text",
+                route_type,
+                len(content or ""),
+            )
             if use_image:
                 return self._send_telegram_photo(image_bytes)
             return self.send_to_telegram(content)
@@ -3129,6 +3140,15 @@ class NotificationService(
             )
 
         target_channels = self.get_channels_for_route(route_type)
+        telegram_in_route = any(
+            ch == NotificationChannel.TELEGRAM for ch in target_channels
+        )
+        logger.info(
+            "[Telegram] 路由过滤后渠道=%s，包含 telegram=%s，路由=%s",
+            [ch.value for ch in target_channels],
+            telegram_in_route,
+            route_type,
+        )
         if not target_channels:
             if context_success:
                 logger.info("已通过消息上下文渠道完成推送（路由后无其他通知渠道）")
@@ -3245,6 +3265,12 @@ class NotificationService(
                         retryable=not bool(result),
                         latency_ms=latency_ms,
                     )
+                )
+                logger.info(
+                    "[Telegram] 渠道 %s 发送%s（latency=%dms）",
+                    channel.value,
+                    "成功" if result else "失败",
+                    latency_ms,
                 )
 
             except Exception as e:
