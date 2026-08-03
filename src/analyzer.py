@@ -3678,10 +3678,33 @@ class GeminiAnalyzer:
             content = self._get_response_field(choice, "content")
 
         if isinstance(content, list):
-            return strip_leading_think_wrapper(self._extract_text_blocks(content))
-        if isinstance(content, str):
-            return strip_leading_think_wrapper(content)
-        return str(content).strip() if content is not None else ""
+            text = self._extract_text_blocks(content)
+            if text:
+                return strip_leading_think_wrapper(text)
+        elif isinstance(content, str):
+            if content:
+                return strip_leading_think_wrapper(content)
+        elif content is not None:
+            stripped = str(content).strip()
+            if stripped:
+                return strip_leading_think_wrapper(stripped)
+
+        # Reasoning models (e.g. DeepSeek) can return a response whose final
+        # `content` is empty while chain-of-thought lives in `reasoning_content`
+        # — typically when the output token budget is exhausted by reasoning.
+        # Fall back to it so a reasoning-only reply is not lost as "empty
+        # response"; the shared empty-response detection still holds when both
+        # fields are genuinely blank.
+        reasoning = None
+        if message is not None:
+            reasoning = self._get_response_field(message, "reasoning_content")
+        if reasoning is None:
+            reasoning = self._get_response_field(choice, "reasoning_content")
+        if isinstance(reasoning, list):
+            reasoning = self._extract_text_blocks(reasoning, strip=False)
+        elif not isinstance(reasoning, str):
+            reasoning = str(reasoning).strip() if reasoning is not None else ""
+        return strip_leading_think_wrapper(reasoning or "")
 
     def _extract_stream_text(self, chunk: Any) -> str:
         """Extract provider-agnostic text delta from a LiteLLM streaming chunk."""

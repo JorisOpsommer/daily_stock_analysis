@@ -271,7 +271,7 @@ class StockAnalysisPipeline:
                 )
                 self.company_reports_analyzer = CompanyReportsAnalyzer(
                     max_tokens=getattr(
-                        self.config, "company_reports_llm_max_tokens", 4000
+                        self.config, "company_reports_llm_max_tokens", 8000
                     ),
                 )
             except Exception as exc:

@@ -17,6 +17,7 @@ Design:
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from src.report_language import normalize_report_language
@@ -81,10 +82,21 @@ _CASHFLOW_ROWS: list[tuple[str, str]] = [
 class CompanyReportsAnalyzer:
     """Compose a prompt from a `CompanyReportsBundle` and run one LLM call."""
 
-    def __init__(self, max_tokens: int = 2000, temperature: float = 0.3) -> None:
+    def __init__(
+        self,
+        max_tokens: int = 2000,
+        temperature: float = 0.3,
+        max_attempts: int = 3,
+        retry_backoff_seconds: float = 2.0,
+    ) -> None:
         # Low temperature: we want precise financial reasoning, not creative prose.
         self._max_tokens = max(256, int(max_tokens or 2000))
         self._temperature = float(temperature)
+        # Retry the LLM call on empty/failed responses before giving up. Empty
+        # responses are a known transient failure mode (the model is reached but
+        # returns blank output), so a bounded retry materially improves yield.
+        self._max_attempts = max(1, int(max_attempts or 1))
+        self._retry_backoff_seconds = max(0.0, float(retry_backoff_seconds or 0.0))
 
     def analyze(
         self,
@@ -107,12 +119,13 @@ class CompanyReportsAnalyzer:
             return ""
         lang = normalize_report_language(report_language)
         logger.info(
-            "[company_reports] starting LLM analysis for %s: %d filing(s), language=%s, max_tokens=%d, temperature=%.2f",
+            "[company_reports] starting LLM analysis for %s: %d filing(s), language=%s, max_tokens=%d, temperature=%.2f, max_attempts=%d",
             bundle.ticker,
             len(bundle.filings),
             lang,
             self._max_tokens,
             self._temperature,
+            self._max_attempts,
         )
         prompt = self._build_prompt(bundle, lang)
         logger.debug(
@@ -120,31 +133,97 @@ class CompanyReportsAnalyzer:
             bundle.ticker,
             len(prompt),
         )
-        try:
-            text = analyzer.generate_text(
-                prompt,
-                max_tokens=self._max_tokens,
-                temperature=self._temperature,
-            )
-        except Exception as exc:  # noqa: BLE001
+
+        last_error: Exception | None = None
+        for attempt in range(1, self._max_attempts + 1):
+            started_at = time.perf_counter()
+            try:
+                text = analyzer.generate_text(
+                    prompt,
+                    max_tokens=self._max_tokens,
+                    temperature=self._temperature,
+                )
+            except Exception as exc:  # noqa: BLE001
+                last_error = exc
+                duration_ms = int((time.perf_counter() - started_at) * 1000)
+                logger.warning(
+                    "[company_reports] LLM analysis attempt %d/%d failed for %s in %dms: %s",
+                    attempt,
+                    self._max_attempts,
+                    bundle.ticker,
+                    duration_ms,
+                    exc,
+                )
+                if attempt < self._max_attempts:
+                    self._sleep_before_retry(attempt, bundle.ticker)
+                continue
+            duration_ms = int((time.perf_counter() - started_at) * 1000)
+            if not text:
+                logger.warning(
+                    "[company_reports] LLM returned empty response for %s on attempt %d/%d after %dms",
+                    bundle.ticker,
+                    attempt,
+                    self._max_attempts,
+                    duration_ms,
+                )
+                if attempt < self._max_attempts:
+                    self._sleep_before_retry(attempt, bundle.ticker)
+                    continue
+                return ""
+            result = str(text).strip()
+            if result:
+                logger.info(
+                    "[company_reports] LLM analysis complete for %s on attempt %d/%d: %d chars returned in %dms",
+                    bundle.ticker,
+                    attempt,
+                    self._max_attempts,
+                    len(result),
+                    duration_ms,
+                )
+                return result
             logger.warning(
-                "[company_reports] LLM analysis failed for %s (fail-open): %s",
+                "[company_reports] LLM returned blank (whitespace-only) response for %s on attempt %d/%d after %dms",
                 bundle.ticker,
-                exc,
+                attempt,
+                self._max_attempts,
+                duration_ms,
             )
-            return ""
-        if not text:
+            if attempt < self._max_attempts:
+                self._sleep_before_retry(attempt, bundle.ticker)
+
+        if last_error is not None:
             logger.warning(
-                "[company_reports] LLM returned empty response for %s", bundle.ticker
+                "[company_reports] LLM analysis failed for %s after %d attempt(s) (fail-open): %s",
+                bundle.ticker,
+                self._max_attempts,
+                last_error,
             )
-            return ""
-        result = str(text).strip()
-        logger.info(
-            "[company_reports] LLM analysis complete for %s: %d chars returned",
-            bundle.ticker,
-            len(result),
+        else:
+            logger.warning(
+                "[company_reports] LLM returned empty response for %s after %d attempt(s) (fail-open)",
+                bundle.ticker,
+                self._max_attempts,
+            )
+        return ""
+
+    def _sleep_before_retry(self, attempt: int, ticker: str) -> None:
+        """Sleep with linear backoff between LLM retry attempts (fail-open)."""
+        if self._retry_backoff_seconds <= 0:
+            return
+        delay = self._retry_backoff_seconds * attempt
+        logger.debug(
+            "[company_reports] retrying LLM analysis for %s in %.1fs (attempt %d/%d)",
+            ticker,
+            delay,
+            attempt,
+            self._max_attempts,
         )
-        return result
+        try:
+            time.sleep(delay)
+        except Exception:  # noqa: BLE001
+            logger.debug(
+                "[company_reports] sleep interrupted before retry for %s", ticker
+            )
 
     # ------------------------------------------------------------------ internals
 

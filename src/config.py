@@ -1188,8 +1188,8 @@ class Config:
     sec_edgar_identity: str | None = None
     # 拉取的 10-Q 数量（1-8 之间由代码 clamp）
     company_reports_filing_count: int = 4
-    # 交给 LLM 生成分析块的最大 token 数
-    company_reports_llm_max_tokens: int = 4000
+    # 交给 LLM 生成分析块的最大 token 数；调高以给推理模型的思维链与正文留出余量
+    company_reports_llm_max_tokens: int = 10000
     # 单次 SEC 拉取整体超时（秒）
     company_reports_fetch_timeout_seconds: float = 20.0
 
@@ -2447,10 +2447,10 @@ class Config:
             ),
             company_reports_llm_max_tokens=parse_env_int(
                 os.getenv("COMPANY_REPORTS_LLM_MAX_TOKENS"),
-                4000,
+                10000,
                 field_name="COMPANY_REPORTS_LLM_MAX_TOKENS",
                 minimum=256,
-                maximum=8192,
+                maximum=16384,
             ),
             company_reports_fetch_timeout_seconds=parse_env_float(
                 os.getenv("COMPANY_REPORTS_FETCH_TIMEOUT_SECONDS"),
