@@ -266,6 +266,10 @@ class ReportDetails(BaseModel):
     sector_rankings: Optional[Any] = Field(None, description="板块涨跌榜（结构 {top, bottom}）")
     concept_rankings: Optional[Any] = Field(None, description="概念板块涨跌榜（结构 {top, bottom}）")
     market_structure: Optional[Any] = Field(None, description="市场结构上下文（题材层 + 个股位置层）")
+    company_reports_analysis: Optional[str] = Field(
+        None,
+        description="SEC 10-Q 公司财报 Warren Buffett 式价值分析文本（Markdown）",
+    )
 
     @model_validator(mode="after")
     def populate_context_derived_details(self) -> "ReportDetails":

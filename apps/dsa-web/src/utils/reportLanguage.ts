@@ -49,6 +49,8 @@ const REPORT_TEXT = {
     laggingBoard: '领跌',
     neutralBoard: '中性',
     reanalyze: '重新分析',
+    companyReports: '公司财报深度分析',
+    companyReportsSubtitle: 'SEC 10-Q · 巴菲特式价值投资视角',
   },
   en: {
     keyInsights: 'KEY INSIGHTS',
@@ -95,6 +97,8 @@ const REPORT_TEXT = {
     laggingBoard: 'Lagging',
     neutralBoard: 'Neutral',
     reanalyze: 'Reanalyze',
+    companyReports: 'Company Reports Deep Dive',
+    companyReportsSubtitle: 'SEC 10-Q · Buffett-style value lens',
   },
   ko: {
     keyInsights: '핵심 인사이트',
@@ -141,6 +145,8 @@ const REPORT_TEXT = {
     laggingBoard: '약세',
     neutralBoard: '중립',
     reanalyze: '재분석',
+    companyReports: '기업 재무 심층 분석',
+    companyReportsSubtitle: 'SEC 10-Q · 버핏식 가치 투자 관점',
   },
 } as const;
 

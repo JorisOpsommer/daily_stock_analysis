@@ -9,6 +9,7 @@ import { formatDateTime } from '../../utils/format';
 import { getMarketPhaseSummaryLabel, getPartialBarLabel } from '../../utils/marketPhase';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { ReportMarkdownBody } from './ReportMarkdownBody';
 
 interface ReportOverviewProps {
   meta: ReportMeta;
@@ -395,6 +396,30 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
           </Card>
         </div>
       </div>
+
+      {/* 公司财报深度分析（SEC 10-Q · 巴菲特式价值分析） */}
+      {details?.companyReportsAnalysis ? (
+        <Card
+          variant="bordered"
+          padding="md"
+          className="home-panel-card home-company-reports-card min-w-0 max-w-full"
+        >
+          <section aria-label={text.companyReports} className="min-w-0 max-w-full">
+            <div className="mb-1 flex min-w-0 items-baseline gap-2">
+              <span className="label-uppercase">{text.companyReportsSubtitle}</span>
+            </div>
+            <h3 className="mb-4 flex items-center gap-2 text-base font-semibold text-foreground">
+              <svg className="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              {text.companyReports}
+            </h3>
+            <div className="home-company-reports-body rounded-lg border border-border/60 bg-background/40 p-4">
+              <ReportMarkdownBody content={details.companyReportsAnalysis} />
+            </div>
+          </section>
+        </Card>
+      ) : null}
     </div>
   );
 };

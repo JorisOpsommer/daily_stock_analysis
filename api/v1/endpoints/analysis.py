@@ -1495,6 +1495,9 @@ def _build_analysis_report(
             sector_rankings=extracted_boards.get("sector_rankings"),
             concept_rankings=extracted_boards.get("concept_rankings"),
             market_structure=market_structure,
+            company_reports_analysis=(
+                (raw_result_data.get("company_reports_analysis") or "").strip() or None
+            ),
         )
 
     return AnalysisReport(
