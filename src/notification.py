@@ -2619,7 +2619,6 @@ class NotificationService(
 
         self._append_financial_summary(lines, blocks, labels, report_language)
         self._append_company_reports_block(lines, result, labels)
-        self._append_company_reports_table_block(lines, result, labels)
         self._append_shareholder_return(lines, blocks, labels, report_language)
         self._append_institutional_flow(lines, blocks, labels)
         self._append_related_boards(lines, blocks, labels)
@@ -2700,33 +2699,6 @@ class NotificationService(
         lines.extend(
             [
                 f"### 📑 {heading}",
-                "",
-                text,
-                "",
-            ]
-        )
-
-    def _append_company_reports_table_block(
-        self,
-        lines: list[str],
-        result: AnalysisResult,
-        labels: dict[str, str],
-    ) -> None:
-        """Append the SEC EDGAR company-reports tabular-overview block.
-
-        Rendered only when the LLM produced non-empty Markdown tables. Slots
-        directly after the narrative company-reports block so readers get the
-        memo and the numbers together.
-        """
-        text = (getattr(result, "company_reports_table", "") or "").strip()
-        if not text:
-            return
-        heading = labels.get(
-            "company_reports_table_heading", "Company Reports Data Table (SEC 10-Q)"
-        )
-        lines.extend(
-            [
-                f"### 📊 {heading}",
                 "",
                 text,
                 "",
