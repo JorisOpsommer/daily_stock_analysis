@@ -270,6 +270,10 @@ class ReportDetails(BaseModel):
         None,
         description="SEC 10-Q 公司财报 Warren Buffett 式价值分析文本（Markdown）",
     )
+    company_reports_table: Optional[str] = Field(
+        None,
+        description="SEC 10-Q 公司财报数据表格概览（Markdown 表格）",
+    )
 
     @model_validator(mode="after")
     def populate_context_derived_details(self) -> "ReportDetails":

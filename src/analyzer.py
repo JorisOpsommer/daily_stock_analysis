@@ -2378,6 +2378,9 @@ class AnalysisResult:
     company_reports_analysis: str = (
         ""  # SEC EDGAR 10-Q 对比分析（INCLUDE_COMPANY_REPORTS，仅美股）
     )
+    company_reports_table: str = (
+        ""  # SEC EDGAR 10-Q 数据表格概览（INCLUDE_COMPANY_REPORTS，仅美股）
+    )
 
     # ========== 情绪面/消息面分析 ==========
     news_summary: str = ""  # 近期重要新闻/公告摘要
@@ -2439,6 +2442,7 @@ class AnalysisResult:
             "sector_position": self.sector_position,
             "company_highlights": self.company_highlights,
             "company_reports_analysis": self.company_reports_analysis,
+            "company_reports_table": self.company_reports_table,
             "news_summary": self.news_summary,
             "market_sentiment": self.market_sentiment,
             "hot_topics": self.hot_topics,
@@ -5603,6 +5607,7 @@ class GeminiAnalyzer:
                 sector_position=data.get("sector_position", ""),
                 company_highlights=data.get("company_highlights", ""),
                 company_reports_analysis=data.get("company_reports_analysis", ""),
+                company_reports_table=data.get("company_reports_table", ""),
                 # 情绪面/消息面
                 news_summary=data.get("news_summary", ""),
                 market_sentiment=data.get("market_sentiment", ""),

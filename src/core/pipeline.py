@@ -76,6 +76,7 @@ from src.services.analysis_context_builder import (
 )
 from src.services.company_reports_analyzer import CompanyReportsAnalyzer
 from src.services.company_reports_service import CompanyReportsService
+from src.services.company_reports_table import CompanyReportsTableGenerator
 from src.services.daily_market_context import (
     DailyMarketContext,
     DailyMarketContextService,
@@ -257,6 +258,7 @@ class StockAnalysisPipeline:
             logger.debug("market hotspot service init failed (fail-open): %s", exc)
         self.company_reports_service: CompanyReportsService | None = None
         self.company_reports_analyzer: CompanyReportsAnalyzer | None = None
+        self.company_reports_table_generator: CompanyReportsTableGenerator | None = None
         self._company_reports_missing_identity_warned = False
         if getattr(self.config, "include_company_reports", False):
             try:
@@ -274,10 +276,16 @@ class StockAnalysisPipeline:
                         self.config, "company_reports_llm_max_tokens", 16000
                     ),
                 )
+                self.company_reports_table_generator = CompanyReportsTableGenerator(
+                    max_tokens=getattr(
+                        self.config, "company_reports_llm_max_tokens", 16000
+                    ),
+                )
             except Exception as exc:
                 logger.debug("company reports service init failed (fail-open): %s", exc)
                 self.company_reports_service = None
                 self.company_reports_analyzer = None
+                self.company_reports_table_generator = None
         self._single_stock_notify_lock = threading.Lock()
         self._daily_market_context_service_lock = threading.Lock()
         self._concept_rankings_cache_lock = threading.Lock()
@@ -595,13 +603,26 @@ class StockAnalysisPipeline:
             )
 
             # Company reports (SEC EDGAR 10-Q + LLM comparison) — US-only, fail-open.
-            # Computed once here so both the standard and agent branches can attach the
-            # resulting markdown block to `result.company_reports_analysis` below.
+            # The bundle is fetched once and shared by the narrative memo and the
+            # tabular overview so we never hit SEC twice for the same ticker.
+            company_reports_bundle = self._fetch_company_reports_bundle(
+                code=code,
+                stock_name=stock_name,
+            )
             company_reports_analysis_text: str = (
                 self._maybe_generate_company_reports_analysis(
                     code=code,
                     stock_name=stock_name,
                     report_language=report_language,
+                    bundle=company_reports_bundle,
+                )
+            )
+            company_reports_table_text: str = (
+                self._maybe_generate_company_reports_table(
+                    code=code,
+                    stock_name=stock_name,
+                    report_language=report_language,
+                    bundle=company_reports_bundle,
                 )
             )
 
@@ -660,6 +681,7 @@ class StockAnalysisPipeline:
                     portfolio_context=portfolio_context,
                     market_structure_context=market_structure_context,
                     company_reports_analysis_text=company_reports_analysis_text,
+                    company_reports_table_text=company_reports_table_text,
                 )
 
             # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
@@ -912,6 +934,8 @@ class StockAnalysisPipeline:
                     result.market_structure_context = market_structure_context
                 if company_reports_analysis_text:
                     result.company_reports_analysis = company_reports_analysis_text
+                if company_reports_table_text:
+                    result.company_reports_table = company_reports_table_text
                 result.market_phase_summary = market_phase_summary
                 result.analysis_context_pack_overview = analysis_context_pack_overview
                 self._refresh_decision_action_for_final_result(
@@ -1252,28 +1276,22 @@ class StockAnalysisPipeline:
 
         return enhanced
 
-    def _maybe_generate_company_reports_analysis(
-        self,
-        code: str,
-        stock_name: str,
-        report_language: str | None,
-    ) -> str:
-        """Fetch last N SEC 10-Q filings + run LLM comparison. Fail-open.
+    def _fetch_company_reports_bundle(
+        self, code: str, stock_name: str
+    ) -> "CompanyReportsBundle | None":
+        """Fetch the SEC 10-Q bundle once, shared by the narrative and table paths.
 
-        Returns an empty string when the feature is disabled, the ticker is
-        not a US stock, the SEC identity is missing, or any downstream call
-        fails. Callers should assign the return value to
-        `AnalysisResult.company_reports_analysis` only when non-empty so we
-        don't clobber a value provided by an upstream code path.
+        Returns `None` when the feature is disabled, the ticker is not a US
+        stock, the SEC identity is missing, the fetch failed, or the bundle is
+        empty. Any failure is fail-open.
         """
         if not getattr(self.config, "include_company_reports", False):
-            return ""
+            return None
         service = self.company_reports_service
-        analyzer_helper = self.company_reports_analyzer
-        if service is None or analyzer_helper is None:
-            return ""
+        if service is None:
+            return None
         if not is_us_stock_code(code):
-            return ""
+            return None
         if not service.is_available:
             if not self._company_reports_missing_identity_warned:
                 logger.warning(
@@ -1281,7 +1299,7 @@ class StockAnalysisPipeline:
                     "skipping company reports analysis for all US tickers this run."
                 )
                 self._company_reports_missing_identity_warned = True
-            return ""
+            return None
         try:
             bundle = service.fetch(code)
         except Exception as exc:  # noqa: BLE001
@@ -1291,8 +1309,29 @@ class StockAnalysisPipeline:
                 code,
                 exc,
             )
-            return ""
+            return None
         if bundle is None or bundle.is_empty:
+            return None
+        return bundle
+
+    def _maybe_generate_company_reports_analysis(
+        self,
+        code: str,
+        stock_name: str,
+        report_language: str | None,
+        bundle: "CompanyReportsBundle | None",
+    ) -> str:
+        """Run the LLM narrative memo over an already-fetched bundle. Fail-open.
+
+        Returns an empty string when the generator is unavailable or any
+        downstream call fails. Callers should assign the return value to
+        `AnalysisResult.company_reports_analysis` only when non-empty so we
+        don't clobber a value provided by an upstream code path.
+        """
+        if bundle is None:
+            return ""
+        analyzer_helper = self.company_reports_analyzer
+        if analyzer_helper is None:
             return ""
         try:
             return analyzer_helper.analyze(
@@ -1303,6 +1342,39 @@ class StockAnalysisPipeline:
         except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "%s(%s) company reports LLM analysis failed (fail-open): %s",
+                stock_name,
+                code,
+                exc,
+            )
+            return ""
+
+    def _maybe_generate_company_reports_table(
+        self,
+        code: str,
+        stock_name: str,
+        report_language: str | None,
+        bundle: "CompanyReportsBundle | None",
+    ) -> str:
+        """Run the LLM tabular overview over an already-fetched bundle. Fail-open.
+
+        Returns an empty string when the generator is unavailable or any
+        downstream call fails. Callers should assign the return value to
+        `AnalysisResult.company_reports_table` only when non-empty.
+        """
+        if bundle is None:
+            return ""
+        table_helper = self.company_reports_table_generator
+        if table_helper is None:
+            return ""
+        try:
+            return table_helper.generate(
+                bundle,
+                self.analyzer,
+                report_language=report_language,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "%s(%s) company reports LLM table generation failed (fail-open): %s",
                 stock_name,
                 code,
                 exc,
@@ -1544,6 +1616,7 @@ class StockAnalysisPipeline:
         portfolio_context: dict[str, Any] | None = None,
         market_structure_context: dict[str, Any] | None = None,
         company_reports_analysis_text: str = "",
+        company_reports_table_text: str = "",
     ) -> AnalysisResult | None:
         """
         使用 Agent 模式分析单只股票。
@@ -1853,6 +1926,8 @@ class StockAnalysisPipeline:
                     result.market_structure_context = market_structure_context
                 if company_reports_analysis_text:
                     result.company_reports_analysis = company_reports_analysis_text
+                if company_reports_table_text:
+                    result.company_reports_table = company_reports_table_text
                 result.market_phase_summary = market_phase_summary
                 result.analysis_context_pack_overview = analysis_context_pack_overview
                 final_action = normalize_decision_action(

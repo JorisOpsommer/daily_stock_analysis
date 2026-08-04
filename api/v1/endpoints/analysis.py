@@ -1498,6 +1498,9 @@ def _build_analysis_report(
             company_reports_analysis=(
                 (raw_result_data.get("company_reports_analysis") or "").strip() or None
             ),
+            company_reports_table=(
+                (raw_result_data.get("company_reports_table") or "").strip() or None
+            ),
         )
 
     return AnalysisReport(

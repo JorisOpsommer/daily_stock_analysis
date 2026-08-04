@@ -584,6 +584,10 @@ def get_history_detail(
                 ((result.get("raw_result") or {}).get("company_reports_analysis") or "").strip()
                 or None
             ),
+            company_reports_table=(
+                ((result.get("raw_result") or {}).get("company_reports_table") or "").strip()
+                or None
+            ),
         )
         
         return AnalysisReport(

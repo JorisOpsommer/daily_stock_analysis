@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] `Analyzer._extract_completion_text` 在正文 `content` 为空时回退读取 `reasoning_content`（DeepSeek 等推理模型在输出 token 预算被思维链耗尽时会返回"仅有思维链、正文为空"的响应，此前被误判为"empty response"而整块失败）；并默认将 `company_reports_llm_max_tokens` 从 4000 上调至 8000 为推理模型的思维链与正文留出余量（`COMPANY_REPORTS_LLM_MAX_TOKENS` 上限仍为 8192，可自行下调）。
 - [改进] `company_reports_analyzer` 三语 prompt 新增第 8 节"核心要点 / Executive Key-Points / 핵심 요점"：要求以 '* ' 开头的 5-8 条紧凑要点收尾，每条绑定真实数字与趋势（如 '* 总负债较上季上升 12%'），覆盖营收/利润率、资本配置、资本回报、股东盈余/FCF 与最大单一风险；确保即便输出 token 预算被推理打断，备忘录末尾仍能给出完整、可快速扫读的 Buffett 式概览。同时将 `company_reports_llm_max_tokens` 默认从 10000 上调至 16000（上限放宽到 32768，`COMPANY_REPORTS_LLM_MAX_TOKENS` 可自行调整）。
 - [改进] `company_reports_analyzer` 的 10-Q 尽调备忘录输出改为只返回"第 7 节 Analyst Remarks（Buffett Lens）"的总结段落 + 六个紧凑结论要点 + 最大风险行：模型仍会在内部完整计算步骤 1-6（利润率、ROE/ROA/ROIC、资产负债表稳健性、股东盈余/FCF、资本配置、每股价值与稀释），但不再把各节的逐期明细数字写进正文，使通知（Telegram / 邮件 / 飞书等共享同一 Markdown 报告）中公司报告区块大幅缩短，同时保留全部关键结论与数字依据。
+- [新功能] 新增 `company_reports_table` 表格概览组件（`company_reports_table.py`）：复用 `company_reports_analyzer` 的上下文表格与同一 LLM 重试/失败熔断模式，对最近 N 份 SEC 10-Q 输出利润表 / 资产负债表 / 现金流量表（含 FCF 与 Owner Earnings）/ 关键比率（毛利率、ROE/ROA/ROIC、负债率、流动/速动比率、利息覆盖、FCF 转化率）四组按报告期逐列的 Markdown 表格，作为 `company_reports_analysis` 备忘录旁的独立 📊 区块渲染；与备忘录共用同一次 SEC 拉取与 `INCLUDE_COMPANY_REPORTS` 开关，`AnalysisResult.company_reports_table`、通知区块、API `ReportDetails` 三语标题同步接入，仍全链路 fail-open。
   <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
   <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
