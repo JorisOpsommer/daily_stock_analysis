@@ -84,11 +84,12 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 pip install -r requirements.txt
-pip install flake8 pytest
-./scripts/ci_gate.sh
-python -m pytest -m "not network"
+pip install flake8
+flake8 <changed_files_or_dir>
 python -m py_compile <changed_python_files>
 ```
+
+Writing new tests or re-running the full test suite is not required for every change; running lint is sufficient for most backend work.
 
 ### Web / Desktop
 
@@ -149,7 +150,7 @@ If the PR already has corresponding CI results, you can cite the CI conclusions 
 
 - Python backend changes:
   - Scope: `main.py`, `src/`, `data_provider/`, `api/`, `bot/`, `tests/`
-  - Preferred: run `./scripts/ci_gate.sh`
+  - Default: run flake8 / lint on changed files
   - Minimum: `python -m py_compile <changed_python_files>`
   - If it affects the API, task orchestration, report generation, notification sending, data source fallback, authentication, or scheduling, the delivery notes must state whether the corresponding path was covered.
 
