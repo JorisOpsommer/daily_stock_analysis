@@ -42,6 +42,7 @@ class CompanyReportsTableGenerator:
         temperature: float = 0.3,
         max_attempts: int = 3,
         retry_backoff_seconds: float = 2.0,
+        reasoning_budget: int = 0,
     ) -> None:
         # Low temperature: we want precise, deterministic tables, not prose.
         self._max_tokens = max(256, int(max_tokens or 2000))
@@ -50,9 +51,11 @@ class CompanyReportsTableGenerator:
         # output is a known failure mode, same as the analyzer).
         self._max_attempts = max(1, int(max_attempts or 1))
         self._retry_backoff_seconds = max(0.0, float(retry_backoff_seconds or 0.0))
+        # Optional thinking budget (tokens) for reasoning models; 0 disables it.
+        self._reasoning_budget = max(0, int(reasoning_budget or 0))
         # Reuse the analyzer's table builder so the raw numbers fed to the LLM
         # are identical across the narrative and table blocks.
-        self._analyzer = CompanyReportsAnalyzer()
+        self._analyzer = CompanyReportsAnalyzer(reasoning_budget=self._reasoning_budget)
 
     def generate(
         self,
@@ -94,11 +97,19 @@ class CompanyReportsTableGenerator:
         for attempt in range(1, self._max_attempts + 1):
             started_at = time.perf_counter()
             try:
-                text = analyzer.generate_text(
-                    prompt,
-                    max_tokens=self._max_tokens,
-                    temperature=self._temperature,
-                )
+                if self._reasoning_budget:
+                    text = analyzer.generate_text(
+                        prompt,
+                        max_tokens=self._max_tokens,
+                        temperature=self._temperature,
+                        reasoning_budget=self._reasoning_budget,
+                    )
+                else:
+                    text = analyzer.generate_text(
+                        prompt,
+                        max_tokens=self._max_tokens,
+                        temperature=self._temperature,
+                    )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 duration_ms = int((time.perf_counter() - started_at) * 1000)

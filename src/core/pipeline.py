@@ -275,10 +275,16 @@ class StockAnalysisPipeline:
                     max_tokens=getattr(
                         self.config, "company_reports_llm_max_tokens", 16000
                     ),
+                    reasoning_budget=getattr(
+                        self.config, "company_reports_llm_reasoning_budget", 32000
+                    ),
                 )
                 self.company_reports_table_generator = CompanyReportsTableGenerator(
                     max_tokens=getattr(
                         self.config, "company_reports_llm_max_tokens", 16000
+                    ),
+                    reasoning_budget=getattr(
+                        self.config, "company_reports_llm_reasoning_budget", 32000
                     ),
                 )
             except Exception as exc:

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [改进] `company_reports_analyzer` / `company_reports_table` 的 LLM 输出预算上调：`COMPANY_REPORTS_LLM_MAX_TOKENS` 默认从 32000 提升到 100000（上限放宽到 131072），为推理模型的思维链与正文留足余量；新增 `COMPANY_REPORTS_LLM_REASONING_BUDGET`（默认 32000）为公司报告分析块与表格概览设置 thinking budget（经 `extra_body` 传给支持 thinking budget 的推理模型，设为 0 关闭并交给模型/路由自行决定），并同步 `.env.example`。
+
 - [修复] 决策仪表盘基础 prompt 整体随 `report_language` 本地化：`en`/`ko` 下内嵌 JSON schema 示例块、评分标准、核心原则与可操作性/稳定性约束整段改为英文（如 `watch_conditions: ["Watch condition 1"]`、`risk_alerts: ["Risk point 1: specific description"]`、`## Scoring Criteria`、`## Actionability and Stability Constraints`），`zh` 保持原有中文措辞字节不变；修复此前即便 `REPORT_LANGUAGE=en` 追加英文输出指令，模型仍会在 risk_alerts / sentiment_summary / core_conclusion / battle_plan / phase_decision 等自由文本字段输出中文的口径漂移问题。
 - [修复] 通知消息中 💼 财务摘要 与 💵 股东回报 的金额/每股货币单位改为随 `report_language` 本地化：`en` 下使用 `835.30M USD` / `0.0000 USD` 等 B/M/K + ISO 货币代码，`zh`/`ko` 维持原有 亿/万 + 汉字货币后缀；此前无论语言设置均硬编码中文货币单位（美元/港元/元）。
 - [改进] `company_reports_analyzer` 重写为巴菲特级尽调备忘录：新增 ROE / ROA / ROIC（年化）、Owner Earnings（1986 伯克希尔股东信定义）、利息覆盖倍数、流动/速动比率、有效税率、每股账面价值与 CAGR 等指标要求，并明确禁止 LaTeX 转义（\( \% \$）以修复下游 Markdown/KaTeX 渲染出现 `\(2025-05\)` 的问题；同步在 `company_reports_service` 中扩展抽取的 XBRL 字段（税前利润、所得税、应付账款、股票薪酬）与对应别名，中英韩三语 prompt 结构一致。

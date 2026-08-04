@@ -89,6 +89,7 @@ class CompanyReportsAnalyzer:
         temperature: float = 0.3,
         max_attempts: int = 3,
         retry_backoff_seconds: float = 2.0,
+        reasoning_budget: int = 0,
     ) -> None:
         # Low temperature: we want precise financial reasoning, not creative prose.
         self._max_tokens = max(256, int(max_tokens or 2000))
@@ -98,6 +99,8 @@ class CompanyReportsAnalyzer:
         # returns blank output), so a bounded retry materially improves yield.
         self._max_attempts = max(1, int(max_attempts or 1))
         self._retry_backoff_seconds = max(0.0, float(retry_backoff_seconds or 0.0))
+        # Optional thinking budget (tokens) for reasoning models; 0 disables it.
+        self._reasoning_budget = max(0, int(reasoning_budget or 0))
 
     def analyze(
         self,
@@ -120,13 +123,14 @@ class CompanyReportsAnalyzer:
             return ""
         lang = normalize_report_language(report_language)
         logger.info(
-            "[company_reports] starting LLM analysis for %s: %d filing(s), language=%s, max_tokens=%d, temperature=%.2f, max_attempts=%d",
+            "[company_reports] starting LLM analysis for %s: %d filing(s), language=%s, max_tokens=%d, temperature=%.2f, max_attempts=%d, reasoning_budget=%d",
             bundle.ticker,
             len(bundle.filings),
             lang,
             self._max_tokens,
             self._temperature,
             self._max_attempts,
+            self._reasoning_budget,
         )
         prompt = self._build_prompt(bundle, lang)
         logger.debug(
@@ -139,11 +143,19 @@ class CompanyReportsAnalyzer:
         for attempt in range(1, self._max_attempts + 1):
             started_at = time.perf_counter()
             try:
-                text = analyzer.generate_text(
-                    prompt,
-                    max_tokens=self._max_tokens,
-                    temperature=self._temperature,
-                )
+                if self._reasoning_budget:
+                    text = analyzer.generate_text(
+                        prompt,
+                        max_tokens=self._max_tokens,
+                        temperature=self._temperature,
+                        reasoning_budget=self._reasoning_budget,
+                    )
+                else:
+                    text = analyzer.generate_text(
+                        prompt,
+                        max_tokens=self._max_tokens,
+                        temperature=self._temperature,
+                    )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
                 duration_ms = int((time.perf_counter() - started_at) * 1000)
@@ -284,8 +296,8 @@ class CompanyReportsAnalyzer:
             "multiply the latest single quarter by 4, or use trailing four quarters when four "
             "sequential quarters are present.\n\n"
             "Work through the following seven analysis steps INTERNALLY. Do NOT print the "
-            "detailed per-period numbers for steps 1-6 — compute them in your head, use them "
-            "only to reach your conclusions, and then report just the synthesis below.\n\n"
+            "detailed per-period numbers for steps 1-6 — compute them internally, only report the final conclusions. "
+            "\n\n"
             "1. Business Quality & Moat Signals: gross margin, operating margin, net margin "
             "per period; Buffett heuristics (consistent gross margin > 40% and net margin > 20% "
             "suggest a durable moat); SG&A and R&D as % of revenue trend; revenue growth "
@@ -316,14 +328,7 @@ class CompanyReportsAnalyzer:
             "7. Analyst Remarks (Buffett Lens): synthesize everything above.\n\n"
             "Let's now create our answer, we want to provide an answer FOR ONLY THE FOLLOWING BELOW in this exact order, with no other content:\n\n"
             "First, write a remarks paragraph of at most 4 sentences summarizing the most "
-            "notable findings that a long-term value investor would care about. Optionally, and "
-            "ONLY if valuable, add one more sentence comparing this company to a well-known "
-            "direct competitor, starting with 'vs. competitors:'. Do NOT invent or assert specific "
-            "peer numbers (margins, growth, valuation) — the competitor's financials are not in "
-            "your input data. Only reference a peer's approximate relative position if you are "
-            "highly confident of it from widely-known public knowledge; otherwise state that a "
-            "grounded peer comparison would require pulling the competitor's filings. Keep it to "
-            "1–2 sentences and frame it as directional, not precise.\n"
+            "notable findings that a long-term value investor would care about. \n"
             "Second, recap each of the seven steps above in a compact bullet list, in order, as "
             "Warren Buffett's conclusion for that step:\n"
             "- Business Quality & Moat Signals: <conclusion>\n"

@@ -4023,6 +4023,18 @@ class GeminiAnalyzer:
 
                 model_short = model.split("/")[-1] if "/" in model else model
                 extra = get_thinking_extra_body(model_short)
+                reasoning_budget = generation_config.get("reasoning_budget")
+                if reasoning_budget:
+                    budget_payload = {
+                        "thinking": {
+                            "type": "enabled",
+                            "budget_tokens": int(reasoning_budget),
+                        }
+                    }
+                    if isinstance(extra, dict):
+                        extra = {**extra, **budget_payload}
+                    else:
+                        extra = budget_payload
                 call_kwargs: dict[str, Any] = {
                     "model": model,
                     "messages": [
@@ -4194,6 +4206,7 @@ class GeminiAnalyzer:
         prompt: str,
         max_tokens: int = 2048,
         temperature: float = 0.7,
+        reasoning_budget: int | None = None,
     ) -> str | None:
         """Public entry point for free-form text generation.
 
@@ -4202,20 +4215,27 @@ class GeminiAnalyzer:
         _litellm_available, _router, _model, _use_openai, or _use_anthropic.
 
         Args:
-            prompt:      Text prompt to send to the LLM.
-            max_tokens:  Maximum tokens in the response (default 2048).
-            temperature: Sampling temperature (default 0.7).
+            prompt:          Text prompt to send to the LLM.
+            max_tokens:      Maximum tokens in the response (default 2048).
+            temperature:     Sampling temperature (default 0.7).
+            reasoning_budget: Optional thinking budget (tokens) for reasoning
+                              models. None/0 disables the explicit budget and
+                              lets the model/router decide. Only honored when
+                              the backend model supports a thinking budget.
 
         Returns:
             Response text, or None if the LLM call fails (error is logged).
         """
         try:
+            generation_config: dict[str, Any] = {
+                "max_tokens": max_tokens,
+                "temperature": temperature,
+            }
+            if reasoning_budget:
+                generation_config["reasoning_budget"] = int(reasoning_budget)
             result = self._call_litellm(
                 prompt,
-                generation_config={
-                    "max_tokens": max_tokens,
-                    "temperature": temperature,
-                },
+                generation_config=generation_config,
             )
             if isinstance(result, tuple):
                 text, model_used, usage = result

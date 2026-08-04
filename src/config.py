@@ -1189,7 +1189,10 @@ class Config:
     # 拉取的 10-Q 数量（1-8 之间由代码 clamp）
     company_reports_filing_count: int = 4
     # 交给 LLM 生成分析块的最大 token 数；调高以给推理模型的思维链与正文留出余量
-    company_reports_llm_max_tokens: int = 32000
+    company_reports_llm_max_tokens: int = 100000
+    # 公司报告 LLM 推理预算（thinking budget tokens）；0 表示不启用、交给模型/路由自行决定。
+    # 仅对支持 thinking budget 的推理模型生效（经 extra_body 传入）。
+    company_reports_llm_reasoning_budget: int = 32000
     # 单次 SEC 拉取整体超时（秒）
     company_reports_fetch_timeout_seconds: float = 20.0
 
@@ -2447,10 +2450,17 @@ class Config:
             ),
             company_reports_llm_max_tokens=parse_env_int(
                 os.getenv("COMPANY_REPORTS_LLM_MAX_TOKENS"),
-                32000,
+                100000,
                 field_name="COMPANY_REPORTS_LLM_MAX_TOKENS",
                 minimum=256,
-                maximum=32768,
+                maximum=131072,
+            ),
+            company_reports_llm_reasoning_budget=parse_env_int(
+                os.getenv("COMPANY_REPORTS_LLM_REASONING_BUDGET"),
+                32000,
+                field_name="COMPANY_REPORTS_LLM_REASONING_BUDGET",
+                minimum=0,
+                maximum=32000,
             ),
             company_reports_fetch_timeout_seconds=parse_env_float(
                 os.getenv("COMPANY_REPORTS_FETCH_TIMEOUT_SECONDS"),
