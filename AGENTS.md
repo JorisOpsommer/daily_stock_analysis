@@ -82,14 +82,9 @@ uvicorn server:app --reload --host 0.0.0.0 --port 8000
 
 ### Backend Verification
 
-```bash
-pip install -r requirements.txt
-pip install flake8
-flake8 <changed_files_or_dir>
-python -m py_compile <changed_python_files>
-```
+Preferred: run `./scripts/ci_gate.sh`
 
-Writing new tests or re-running the full test suite is not required for every change; running lint is sufficient for most backend work.
+- Default: run flake8 / lint on changed files
 
 ### Web / Desktop
 
