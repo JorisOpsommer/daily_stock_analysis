@@ -17,6 +17,7 @@ Design:
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -170,7 +171,7 @@ class CompanyReportsAnalyzer:
                     self._sleep_before_retry(attempt, bundle.ticker)
                     continue
                 return ""
-            result = str(text).strip()
+            result = self._sanitize_latex_escapes(str(text).strip())
             if result:
                 logger.info(
                     "[company_reports] LLM analysis complete for %s on attempt %d/%d: %d chars returned in %dms",
@@ -448,6 +449,18 @@ class CompanyReportsAnalyzer:
             elif "(Q" in label and "Quarterly" not in seen:
                 seen.append("Quarterly")
         return " / ".join(seen)
+
+    @staticmethod
+    def _sanitize_latex_escapes(text: str) -> str:
+        """Strip LaTeX escape backslashes so downstream renderers never treat
+        text as math. Despite the prompt explicitly forbidding `\\(` / `\\$`,
+        models sometimes still emit them (Feishu/Telegram/web render KaTeX on
+        those), so we defensively collapse `\\(` -> `(`, `\\)` -> `)`, `\\$` ->
+        `$`, `\\%` -> `%`, `\\&` -> `&`, `\\_` -> `_`, etc. anywhere they appear.
+        """
+        if "\\" not in text:
+            return text
+        return re.sub(r"\\([()$%&_#{}~^|<>+=\-*/!.,:;])", r"\1", text)
 
     @staticmethod
     def _format_number(value: float) -> str:
