@@ -12,8 +12,9 @@ Design mirrors `CompanyReportsAnalyzer`:
 - Consumes the same `CompanyReportsBundle` from `company_reports_service`.
 - Reuses the analyzer's context-table builder so the raw numbers the LLM sees
   are byte-for-byte identical to the narrative path.
-- Fail-open: any exception returns an empty string; the caller renders no
-  block when the string is empty.
+- Fail-open: any exception returns a short `Error: ...` message so the caller
+  renders an explicit error block; the reasoning (chain-of-thought) fallback is
+  disabled so raw thinking is never surfaced as table content.
 - Language-aware: prompt language follows the pipeline's `REPORT_LANGUAGE`.
 - Bounded retry on empty/failed LLM responses (fail-open), same as analyzer.
 """
@@ -30,6 +31,15 @@ from src.services.company_reports_analyzer import CompanyReportsAnalyzer
 from src.services.company_reports_service import CompanyReportsBundle
 
 logger = logging.getLogger(__name__)
+
+# Failure strings returned to the caller instead of an empty string. The
+# caller renders the block only when the returned value is non-empty, so an
+# explicit error message surfaces a real failure to the user instead of
+# silently dropping the section (or leaking raw chain-of-thought from
+# `generate_text`'s reasoning fallback).
+_ERROR_NO_DATA = "Error: no SEC 10-Q filings available"
+_ERROR_NO_ANALYZER = "Error: LLM analyzer unavailable"
+_ERROR_EMPTY = "Error: empty content"
 
 
 class CompanyReportsTableGenerator:
@@ -63,19 +73,19 @@ class CompanyReportsTableGenerator:
         analyzer: Any,
         report_language: str | None = None,
     ) -> str:
-        """Return LLM-generated Markdown tables, or an empty string on failure."""
+        """Return LLM-generated Markdown tables, or an error message on failure."""
         if bundle is None or bundle.is_empty:
             logger.debug(
                 "[company_reports_table] skipped for %s: bundle is None or empty",
                 getattr(bundle, "ticker", "?"),
             )
-            return ""
+            return _ERROR_NO_DATA
         if analyzer is None or not hasattr(analyzer, "generate_text"):
             logger.warning(
                 "[company_reports_table] skipped for %s: LLM analyzer unavailable or missing generate_text",
                 bundle.ticker,
             )
-            return ""
+            return _ERROR_NO_ANALYZER
         lang = normalize_report_language(report_language)
         logger.info(
             "[company_reports_table] starting LLM table generation for %s: %d filing(s), language=%s, max_tokens=%d, temperature=%.2f, max_attempts=%d",
@@ -103,12 +113,14 @@ class CompanyReportsTableGenerator:
                         max_tokens=self._max_tokens,
                         temperature=self._temperature,
                         reasoning_budget=self._reasoning_budget,
+                        allow_reasoning_fallback=False,
                     )
                 else:
                     text = analyzer.generate_text(
                         prompt,
                         max_tokens=self._max_tokens,
                         temperature=self._temperature,
+                        allow_reasoning_fallback=False,
                     )
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
@@ -136,7 +148,7 @@ class CompanyReportsTableGenerator:
                 if attempt < self._max_attempts:
                     self._sleep_before_retry(attempt, bundle.ticker)
                     continue
-                return ""
+                return _ERROR_EMPTY
             result = self._sanitize_latex_escapes(str(text).strip())
             if result:
                 logger.info(
@@ -160,18 +172,18 @@ class CompanyReportsTableGenerator:
 
         if last_error is not None:
             logger.warning(
-                "[company_reports_table] LLM generation failed for %s after %d attempt(s) (fail-open): %s",
+                "[company_reports_table] LLM generation failed for %s after %d attempt(s): %s",
                 bundle.ticker,
                 self._max_attempts,
                 last_error,
             )
-        else:
-            logger.warning(
-                "[company_reports_table] LLM returned empty response for %s after %d attempt(s) (fail-open)",
-                bundle.ticker,
-                self._max_attempts,
-            )
-        return ""
+            return f"Error: {last_error}"
+        logger.warning(
+            "[company_reports_table] LLM returned empty response for %s after %d attempt(s)",
+            bundle.ticker,
+            self._max_attempts,
+        )
+        return _ERROR_EMPTY
 
     def _sleep_before_retry(self, attempt: int, ticker: str) -> None:
         """Sleep with linear backoff between LLM retry attempts (fail-open)."""

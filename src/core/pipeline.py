@@ -1329,10 +1329,12 @@ class StockAnalysisPipeline:
     ) -> str:
         """Run the LLM narrative memo over an already-fetched bundle. Fail-open.
 
-        Returns an empty string when the generator is unavailable or any
-        downstream call fails. Callers should assign the return value to
-        `AnalysisResult.company_reports_analysis` only when non-empty so we
-        don't clobber a value provided by an upstream code path.
+        Returns an empty string when the generator is unavailable or an
+        unexpected exception occurs. On LLM failure the analyzer returns a
+        short `Error: ...` message that is surfaced to the user. Callers should
+        assign the return value to `AnalysisResult.company_reports_analysis`
+        only when non-empty so we don't clobber a value provided by an upstream
+        code path.
         """
         if bundle is None:
             return ""
@@ -1363,9 +1365,11 @@ class StockAnalysisPipeline:
     ) -> str:
         """Run the LLM tabular overview over an already-fetched bundle. Fail-open.
 
-        Returns an empty string when the generator is unavailable or any
-        downstream call fails. Callers should assign the return value to
-        `AnalysisResult.company_reports_table` only when non-empty.
+        Returns an empty string when the generator is unavailable or an
+        unexpected exception occurs. On LLM failure the generator returns a
+        short `Error: ...` message that is surfaced to the user. Callers should
+        assign the return value to `AnalysisResult.company_reports_table` only
+        when non-empty.
         """
         if bundle is None:
             return ""

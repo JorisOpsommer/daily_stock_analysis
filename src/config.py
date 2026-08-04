@@ -2770,6 +2770,13 @@ class Config:
                     headers = dict(ch.get("extra_headers") or {})
                     if ch["base_url"] and "aihubmix.com" in ch["base_url"]:
                         headers.setdefault("APP-Code", "GPIJ3886")
+                    # Tag the app so OpenRouter shows "daily_stock_analysis" instead of "unknown"
+                    if ch["base_url"] and "openrouter.ai" in ch["base_url"]:
+                        headers.setdefault(
+                            "HTTP-Referer",
+                            "https://github.com/ZhuLinsen/daily_stock_analysis",
+                        )
+                        headers.setdefault("X-Title", "daily_stock_analysis")
                     if headers:
                         litellm_params["extra_headers"] = headers
 
@@ -2840,6 +2847,14 @@ class Config:
                     params["api_base"] = openai_base_url
                 if openai_base_url and "aihubmix.com" in openai_base_url:
                     params["extra_headers"] = {"APP-Code": "GPIJ3886"}
+                if openai_base_url and "openrouter.ai" in openai_base_url:
+                    extra_headers = dict(params.get("extra_headers") or {})
+                    extra_headers.setdefault(
+                        "HTTP-Referer",
+                        "https://github.com/ZhuLinsen/daily_stock_analysis",
+                    )
+                    extra_headers.setdefault("X-Title", "daily_stock_analysis")
+                    params["extra_headers"] = extra_headers
                 model_list.append(
                     {
                         "model_name": "__legacy_openai__",
@@ -4029,6 +4044,14 @@ def extra_litellm_params(model: str, config: Config) -> dict[str, Any]:
             params["api_base"] = config.openai_base_url
         if config.openai_base_url and "aihubmix.com" in config.openai_base_url:
             params["extra_headers"] = {"APP-Code": "GPIJ3886"}
+        if config.openai_base_url and "openrouter.ai" in config.openai_base_url:
+            extra_headers = dict(params.get("extra_headers") or {})
+            extra_headers.setdefault(
+                "HTTP-Referer",
+                "https://github.com/ZhuLinsen/daily_stock_analysis",
+            )
+            extra_headers.setdefault("X-Title", "daily_stock_analysis")
+            params["extra_headers"] = extra_headers
     return params
 
 

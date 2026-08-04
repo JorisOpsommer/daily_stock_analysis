@@ -190,6 +190,21 @@ class TestCallLitellmVision:
             assert kwargs["api_base"] == "https://aihubmix.com/v1"
             assert kwargs["extra_headers"]["APP-Code"] == "GPIJ3886"
 
+    def test_openai_model_tags_openrouter_headers(self):
+        cfg = _cfg(
+            openai_vision_model="openai/gpt-4o-mini",
+            openai_api_keys=[_OPENAI_KEY],
+            openai_base_url="https://openrouter.ai/api/v1",
+        )
+        with patch("src.services.image_stock_extractor.get_config", return_value=cfg), \
+             patch("src.services.image_stock_extractor.litellm.completion",
+                   return_value=self._good_response()) as mock_comp:
+            _call_litellm_vision("b64", "image/jpeg")
+            kwargs = mock_comp.call_args[1]
+            assert kwargs["api_base"] == "https://openrouter.ai/api/v1"
+            assert kwargs["extra_headers"]["X-Title"] == "daily_stock_analysis"
+            assert "HTTP-Referer" in kwargs["extra_headers"]
+
     def test_raises_when_model_not_configured(self):
         cfg = _cfg(openai_vision_model=None, litellm_model="", gemini_api_keys=[], anthropic_api_keys=[], openai_api_keys=[])
         with patch("src.services.image_stock_extractor.get_config", return_value=cfg):

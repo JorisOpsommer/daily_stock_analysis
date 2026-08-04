@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+- [修复] `company_reports_analyzer` / `company_reports_table` 不再在 LLM 正文为空或调用失败时把思维链（chain-of-thought / `reasoning_content`）作为回退正文展示（此前会撑爆通知与 Web 门户）；改为关闭推理回退并返回明确的错误文案：内容为空返回 `Error: empty content`，调用异常返回实际错误信息（`Error: <原因>`），无数据/分析器不可用时返回对应提示，通知与 Web 端仍按非空才渲染该区块。
+
 - [改进] `company_reports_analyzer` / `company_reports_table` 的 LLM 输出预算上调：`COMPANY_REPORTS_LLM_MAX_TOKENS` 默认从 32000 提升到 100000（上限放宽到 131072），为推理模型的思维链与正文留足余量；新增 `COMPANY_REPORTS_LLM_REASONING_BUDGET`（默认 32000）为公司报告分析块与表格概览设置 thinking budget（经 `extra_body` 传给支持 thinking budget 的推理模型，设为 0 关闭并交给模型/路由自行决定），并同步 `.env.example`。
 
 - [修复] 决策仪表盘基础 prompt 整体随 `report_language` 本地化：`en`/`ko` 下内嵌 JSON schema 示例块、评分标准、核心原则与可操作性/稳定性约束整段改为英文（如 `watch_conditions: ["Watch condition 1"]`、`risk_alerts: ["Risk point 1: specific description"]`、`## Scoring Criteria`、`## Actionability and Stability Constraints`），`zh` 保持原有中文措辞字节不变；修复此前即便 `REPORT_LANGUAGE=en` 追加英文输出指令，模型仍会在 risk_alerts / sentiment_summary / core_conclusion / battle_plan / phase_decision 等自由文本字段输出中文的口径漂移问题。
@@ -41,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [修复] 统一等价股票代码的本地日线候选与同源窗口解析；冲突沪深交易所代码不再降级匹配裸码，回测仅接受快照或交易日历确认的起点，并在同一起点中优先完整的单一代码窗口。
 - [新功能] 新增按 individual SkillAgent 自身 signal、版本化 engine 与本地已存同源日线窗口计算并持久化 `skill_opinion_outcomes` 的核心服务；本阶段不提供管理员 API、表现统计、样本充足度或权重调整。
 - [新功能] 新增 `INCLUDE_COMPANY_REPORTS` opt-in：启用后仅对美股通过 edgartools 拉取最近若干份 SEC 10-Q，并复用当前配置的 LLM 生成"公司报告"分析块，追加到通知消息中 💼 财务摘要 之后；需配置 `SEC_EDGAR_IDENTITY`，A 股/港股等其它市场静默跳过，失败全链路 fail-open。
+- [改进] OpenRouter 渠道请求自动携带 `X-Title: daily_stock_analysis` 与 `HTTP-Referer` 标头，使 OpenRouter 仪表盘中的应用标识从 "unknown" 显示为 "daily_stock_analysis"；对 channel、legacy OpenAI 与视觉提取路径均生效，无需额外配置。
   <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
   <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 

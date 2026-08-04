@@ -273,6 +273,14 @@ def _call_litellm_vision(image_b64: str, mime_type: str, api_key: Optional[str] 
             call_kwargs["api_base"] = cfg.openai_base_url
         if cfg.openai_base_url and "aihubmix.com" in cfg.openai_base_url:
             call_kwargs["extra_headers"] = {"APP-Code": "GPIJ3886"}
+        if cfg.openai_base_url and "openrouter.ai" in cfg.openai_base_url:
+            extra_headers = dict(call_kwargs.get("extra_headers") or {})
+            extra_headers.setdefault(
+                "HTTP-Referer",
+                "https://github.com/ZhuLinsen/daily_stock_analysis",
+            )
+            extra_headers.setdefault("X-Title", "daily_stock_analysis")
+            call_kwargs["extra_headers"] = extra_headers
 
     if getattr(litellm, "completion", None) is None:
         import litellm as litellm_module

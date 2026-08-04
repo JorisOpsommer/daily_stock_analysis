@@ -47,8 +47,11 @@ class _FakeAnalyzer:
         self.results = list(results)
         self.calls = []
 
-    def generate_text(self, prompt, max_tokens=None, temperature=None):
+    def generate_text(
+        self, prompt, max_tokens=None, temperature=None, allow_reasoning_fallback=None
+    ):
         self.calls.append((prompt, max_tokens, temperature))
+        self.last_allow_reasoning_fallback = allow_reasoning_fallback
         if not self.results:
             return ""
         return self.results.pop(0)
@@ -64,17 +67,23 @@ def _make_generator(max_attempts=3, retry_backoff_seconds=0.0):
 
 def test_generate_skips_empty_bundle():
     gen = _make_generator()
-    assert gen.generate(CompanyReportsBundle(ticker="AAPL"), _FakeAnalyzer([""])) == ""
+    assert (
+        gen.generate(CompanyReportsBundle(ticker="AAPL"), _FakeAnalyzer([""]))
+        == "Error: no SEC 10-Q filings available"
+    )
 
 
 def test_generate_skips_none_bundle():
     gen = _make_generator()
-    assert gen.generate(None, _FakeAnalyzer([""])) == ""
+    assert (
+        gen.generate(None, _FakeAnalyzer([""]))
+        == "Error: no SEC 10-Q filings available"
+    )
 
 
 def test_generate_skips_missing_generate_text():
     gen = _make_generator()
-    assert gen.generate(_make_bundle(), SimpleNamespace()) == ""
+    assert gen.generate(_make_bundle(), SimpleNamespace()) == "Error: LLM analyzer unavailable"
 
 
 def test_generate_returns_sanitized_markdown():
@@ -99,7 +108,7 @@ def test_generate_fail_open_after_all_empty():
     gen = _make_generator(max_attempts=2)
     fake = _FakeAnalyzer(["", ""])
     result = gen.generate(_make_bundle(), fake)
-    assert result == ""
+    assert result == "Error: empty content"
     assert len(fake.calls) == 2
 
 
@@ -109,7 +118,16 @@ def test_generate_fail_open_on_exception():
             raise RuntimeError("llm down")
 
     gen = _make_generator(max_attempts=2, retry_backoff_seconds=0.0)
-    assert gen.generate(_make_bundle(), _Boom()) == ""
+    assert gen.generate(_make_bundle(), _Boom()) == "Error: llm down"
+
+
+def test_generate_passes_allow_reasoning_fallback_false():
+    gen = _make_generator()
+    fake = _FakeAnalyzer(["## Cash Flow\n\n| Metric | Value |"])
+    gen.generate(_make_bundle(), fake)
+    # The generator must forward allow_reasoning_fallback=False so the LLM's
+    # reasoning (chain-of-thought) fallback never leaks into the table block.
+    assert fake.last_allow_reasoning_fallback is False
 
 
 def test_prompt_contains_table_sections_and_data_conventions():

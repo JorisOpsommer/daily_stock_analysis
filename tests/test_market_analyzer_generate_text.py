@@ -189,7 +189,11 @@ class TestAnalyzerGenerateText:
             assert result == "市场分析报告"
             mock_call.assert_called_once_with(
                 "写一份复盘",
-                generation_config={"max_tokens": 1024, "temperature": 0.5},
+                generation_config={
+                    "max_tokens": 1024,
+                    "temperature": 0.5,
+                    "allow_reasoning_fallback": True,
+                },
             )
 
     def test_generate_text_does_not_persist_unavailable_usage(self):

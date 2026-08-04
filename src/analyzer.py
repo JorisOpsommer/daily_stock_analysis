@@ -3659,7 +3659,9 @@ class GeminiAnalyzer:
         result = "".join(parts)
         return result.strip() if strip else result
 
-    def _extract_completion_text(self, response: Any) -> str:
+    def _extract_completion_text(
+        self, response: Any, allow_reasoning_fallback: bool = True
+    ) -> str:
         """Extract text from non-stream LiteLLM completion responses."""
         choices = self._get_response_field(response, "choices")
         if not choices:
@@ -3698,7 +3700,11 @@ class GeminiAnalyzer:
         # — typically when the output token budget is exhausted by reasoning.
         # Fall back to it so a reasoning-only reply is not lost as "empty
         # response"; the shared empty-response detection still holds when both
-        # fields are genuinely blank.
+        # fields are genuinely blank. Callers that must not surface raw
+        # chain-of-thought (e.g. the company-reports blocks) disable this via
+        # `allow_reasoning_fallback=False` so an empty `content` yields "".
+        if not allow_reasoning_fallback:
+            return ""
         reasoning = None
         if message is not None:
             reasoning = self._get_response_field(message, "reasoning_content")
@@ -4165,7 +4171,12 @@ class GeminiAnalyzer:
                     logger=logger,
                 )
 
-                content = self._extract_completion_text(response)
+                content = self._extract_completion_text(
+                    response,
+                    allow_reasoning_fallback=bool(
+                        generation_config.get("allow_reasoning_fallback", True)
+                    ),
+                )
                 if content:
                     usage_messages = (
                         None if audit_context is not None else call_kwargs["messages"]
@@ -4207,6 +4218,7 @@ class GeminiAnalyzer:
         max_tokens: int = 2048,
         temperature: float = 0.7,
         reasoning_budget: int | None = None,
+        allow_reasoning_fallback: bool = True,
     ) -> str | None:
         """Public entry point for free-form text generation.
 
@@ -4222,6 +4234,13 @@ class GeminiAnalyzer:
                               models. None/0 disables the explicit budget and
                               lets the model/router decide. Only honored when
                               the backend model supports a thinking budget.
+            allow_reasoning_fallback: When True (default), a response whose
+                              final `content` is empty but carries
+                              `reasoning_content` falls back to that
+                              chain-of-thought text. Set False when raw
+                              reasoning must never be surfaced (e.g. report
+                              blocks that render directly to users), so an
+                              empty content is reported as empty.
 
         Returns:
             Response text, or None if the LLM call fails (error is logged).
@@ -4230,6 +4249,7 @@ class GeminiAnalyzer:
             generation_config: dict[str, Any] = {
                 "max_tokens": max_tokens,
                 "temperature": temperature,
+                "allow_reasoning_fallback": bool(allow_reasoning_fallback),
             }
             if reasoning_budget:
                 generation_config["reasoning_budget"] = int(reasoning_budget)
