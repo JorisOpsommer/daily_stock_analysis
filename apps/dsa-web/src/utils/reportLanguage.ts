@@ -51,6 +51,7 @@ const REPORT_TEXT = {
     reanalyze: '重新分析',
     companyReports: '公司财报深度分析',
     companyReportsSubtitle: 'SEC 10-Q · 巴菲特式价值投资视角',
+    companyReportsTable: '公司财报数据表（SEC 10-Q）',
   },
   en: {
     keyInsights: 'KEY INSIGHTS',
@@ -99,6 +100,7 @@ const REPORT_TEXT = {
     reanalyze: 'Reanalyze',
     companyReports: 'Company Reports Deep Dive',
     companyReportsSubtitle: 'SEC 10-Q · Buffett-style value lens',
+    companyReportsTable: 'Company Reports Data Table (SEC 10-Q)',
   },
   ko: {
     keyInsights: '핵심 인사이트',
@@ -147,6 +149,7 @@ const REPORT_TEXT = {
     reanalyze: '재분석',
     companyReports: '기업 재무 심층 분석',
     companyReportsSubtitle: 'SEC 10-Q · 버핏식 가치 투자 관점',
+    companyReportsTable: '기업 보고서 데이터 표 (SEC 10-Q)',
   },
 } as const;
 

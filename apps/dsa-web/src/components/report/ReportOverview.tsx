@@ -1,4 +1,5 @@
-import type React from 'react';
+import React, { useState } from 'react';
+import { cn } from '../../utils/cn';
 import type {
   ReportDetails as ReportDetailsType,
   ReportMeta,
@@ -171,6 +172,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
   const { t } = useUiLanguage();
   const reportLanguage = normalizeReportLanguage(meta.reportLanguage);
   const text = getReportText(reportLanguage);
+  const [companyReportsTableOpen, setCompanyReportsTableOpen] = useState(false);
   const marketPhaseLabel = getMarketPhaseSummaryLabel(meta.marketPhaseSummary, reportLanguage);
   const partialBarLabel = meta.marketPhaseSummary?.isPartialBar === true
     ? getPartialBarLabel(reportLanguage)
@@ -418,6 +420,57 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               <ReportMarkdownBody content={details.companyReportsAnalysis} />
             </div>
           </section>
+        </Card>
+      ) : null}
+
+      {/* 公司财报数据表（SEC 10-Q · 折叠手风琴） */}
+      {details?.companyReportsTable ? (
+        <Card
+          variant="bordered"
+          padding="none"
+          className="home-panel-card home-company-reports-table-card min-w-0 max-w-full overflow-hidden"
+        >
+          <button
+            type="button"
+            onClick={() => setCompanyReportsTableOpen((open) => !open)}
+            aria-expanded={companyReportsTableOpen}
+            aria-controls="company-reports-table-panel"
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-hover"
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <svg className="h-4 w-4 shrink-0 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M3 14h18M9 4v16M15 4v16M5 4h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z" />
+              </svg>
+              <span className="truncate text-sm font-semibold text-foreground">{text.companyReportsTable}</span>
+            </span>
+            <svg
+              className={cn(
+                'h-5 w-5 shrink-0 text-secondary-text transition-transform duration-300',
+                companyReportsTableOpen && 'rotate-180',
+              )}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <div
+            id="company-reports-table-panel"
+            role="region"
+            aria-label={text.companyReportsTable}
+            className={cn(
+              'grid transition-[grid-template-rows] duration-300 ease-in-out',
+              companyReportsTableOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]',
+            )}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className="home-company-reports-body border-t border-border/60 bg-background/40 p-4">
+                <ReportMarkdownBody content={details.companyReportsTable} />
+              </div>
+            </div>
+          </div>
         </Card>
       ) : null}
     </div>

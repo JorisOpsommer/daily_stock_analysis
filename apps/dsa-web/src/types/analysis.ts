@@ -366,6 +366,7 @@ export interface ReportDetails {
   conceptRankings?: SectorRankings;
   marketStructure?: MarketStructureContext | null;
   companyReportsAnalysis?: string;
+  companyReportsTable?: string;
 }
 
 /** Full analysis report */

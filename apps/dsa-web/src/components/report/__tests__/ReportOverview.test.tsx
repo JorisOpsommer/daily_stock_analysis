@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ReportOverview } from '../ReportOverview';
 
@@ -307,5 +307,41 @@ describe('ReportOverview', () => {
     expect(screen.getByText('白酒')).toBeInTheDocument();
     expect(screen.getByText('领跌')).toBeInTheDocument();
     expect(screen.getByText('-2.50%')).toBeInTheDocument();
+  });
+
+  it('hides company reports table accordion when no table data is present', () => {
+    render(<ReportOverview meta={baseMeta} summary={baseSummary} />);
+
+    expect(screen.queryByText('公司财报数据表（SEC 10-Q）')).not.toBeInTheDocument();
+  });
+
+  it('collapses the company reports table accordion by default and expands on click', () => {
+    const tableContent = '## 利润表\n\n| 指标 | 2026-06-27 (Q3) |\n| --- | --- |\n| 营业收入 | 12.5B |';
+
+    render(
+      <ReportOverview
+        meta={baseMeta}
+        summary={baseSummary}
+        details={{ companyReportsTable: tableContent }}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', { name: '公司财报数据表（SEC 10-Q）' });
+    const panel = screen.getByRole('region', { name: '公司财报数据表（SEC 10-Q）' });
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(panel).not.toHaveClass('grid-rows-[1fr]');
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).toHaveClass('grid-rows-[1fr]');
+    expect(screen.getByText('营业收入')).toBeInTheDocument();
+    expect(screen.getByText('12.5B')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(panel).not.toHaveClass('grid-rows-[1fr]');
   });
 });
