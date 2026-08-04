@@ -3068,7 +3068,12 @@ class GeminiAnalyzer:
         else:
             skills_section = ""
             if skill_instructions:
-                skills_section = f"## 激活的交易技能\n\n{skill_instructions}\n"
+                if lang in ("en", "ko"):
+                    skills_section = (
+                        f"## Active Trading Skills\n\n{skill_instructions}\n"
+                    )
+                else:
+                    skills_section = f"## 激活的交易技能\n\n{skill_instructions}\n"
             default_skill_policy_section = ""
             if default_skill_policy:
                 default_skill_policy_section = f"{default_skill_policy}\n"

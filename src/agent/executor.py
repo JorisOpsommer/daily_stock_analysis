@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Agent Executor — ReAct loop with tool calling.
 
@@ -17,23 +16,27 @@ same implementation.
 import json
 import logging
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
-from src.config import get_config
-from src.agent.chat_context import build_agent_chat_context_bundle, build_visible_chat_history
+from src.agent.chat_context import (
+    build_agent_chat_context_bundle,
+    build_visible_chat_history,
+)
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.provider_trace import persist_provider_trace_turns
-from src.agent.runner import run_agent_loop, parse_dashboard_json
+from src.agent.runner import parse_dashboard_json, run_agent_loop
 from src.agent.runtime_facts import AgentRuntimeFacts
 from src.agent.stock_scope import StockScope, resolve_stock_scope
-from src.storage import get_db
 from src.agent.tools.registry import ToolRegistry
-from src.report_language import normalize_report_language
-from src.market_context import get_market_role, get_market_guidelines
+from src.config import get_config
+from src.market_context import get_market_guidelines, get_market_role
 from src.market_phase_prompt import format_market_phase_prompt_section
 from src.market_structure_prompt import format_market_structure_prompt_section
+from src.report_language import normalize_report_language
 from src.services.daily_market_context import format_daily_market_context_prompt_section
+from src.storage import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -42,23 +45,29 @@ logger = logging.getLogger(__name__)
 # Agent result
 # ============================================================
 
+
 @dataclass
 class AgentResult:
     """Result from an agent execution run."""
+
     success: bool = False
-    content: str = ""                          # final text answer from agent
-    dashboard: Optional[Dict[str, Any]] = None  # parsed dashboard JSON
-    tool_calls_log: List[Dict[str, Any]] = field(default_factory=list)  # execution trace
+    content: str = ""  # final text answer from agent
+    dashboard: dict[str, Any] | None = None  # parsed dashboard JSON
+    tool_calls_log: list[dict[str, Any]] = field(
+        default_factory=list
+    )  # execution trace
     total_steps: int = 0
     total_tokens: int = 0
     provider: str = ""
-    model: str = ""                            # comma-separated models used (supports fallback)
-    error: Optional[str] = None
-    messages: List[Dict[str, Any]] = field(default_factory=list)
-    runtime_facts: Optional[AgentRuntimeFacts] = None  # internal; never serialized into dashboard
+    model: str = ""  # comma-separated models used (supports fallback)
+    error: str | None = None
+    messages: list[dict[str, Any]] = field(default_factory=list)
+    runtime_facts: AgentRuntimeFacts | None = (
+        None  # internal; never serialized into dashboard
+    )
     backend: str = ""
-    error_code: Optional[str] = None
-    usage: Optional[Dict[str, Any]] = None
+    error_code: str | None = None
+    usage: dict[str, Any] | None = None
 
 
 # ============================================================
@@ -521,15 +530,15 @@ class PreparedAgentChat:
     """System prompt, visible history, and scope shared by Agent backends."""
 
     system_prompt: str
-    history_messages: List[Dict[str, Any]]
-    stock_scope: Optional[StockScope]
+    history_messages: list[dict[str, Any]]
+    stock_scope: StockScope | None
 
 
 def prepare_agent_chat(
     *,
     message: str,
     session_id: str,
-    context: Optional[Dict[str, Any]],
+    context: dict[str, Any] | None,
     config: Any,
     context_llm_adapter: Any,
     skill_instructions: str,
@@ -547,13 +556,18 @@ def prepare_agent_chat(
     )
     effective_context = scope_resolution.effective_context
 
+    report_language = normalize_report_language(
+        (effective_context or {}).get("report_language", "zh")
+    )
     skills_section = ""
     if skill_instructions:
-        skills_section = f"## 激活的交易技能\n\n{skill_instructions}"
+        if report_language == "en":
+            skills_section = f"## Active Trading Skills\n\n{skill_instructions}"
+        else:
+            skills_section = f"## 激活的交易技能\n\n{skill_instructions}"
     default_skill_policy_section = ""
     if default_skill_policy:
         default_skill_policy_section = f"\n{default_skill_policy}\n"
-    report_language = normalize_report_language((effective_context or {}).get("report_language", "zh"))
     stock_code = (effective_context or {}).get("stock_code", "")
     if use_codex_prompt:
         prompt_template = CODEX_CHAT_SYSTEM_PROMPT
@@ -568,10 +582,18 @@ def prepare_agent_chat(
         skills_section=skills_section,
         language_section=_build_language_section(report_language, chat_mode=True),
     )
+    if report_language == "en":
+        system_prompt = (
+            _build_language_section(report_language, chat_mode=True).strip()
+            + "\n\n"
+            + system_prompt
+        )
 
     if include_provider_trace:
         history_messages = list(
-            build_agent_chat_context_bundle(session_id, context_llm_adapter, config).context_messages
+            build_agent_chat_context_bundle(
+                session_id, context_llm_adapter, config
+            ).context_messages
         )
     else:
         history_messages = list(
@@ -586,21 +608,55 @@ def prepare_agent_chat(
     if effective_context:
         context_parts = []
         if effective_context.get("stock_code"):
-            context_parts.append(f"股票代码: {effective_context['stock_code']}")
+            if report_language == "en":
+                context_parts.append(f"Stock code: {effective_context['stock_code']}")
+            else:
+                context_parts.append(f"股票代码: {effective_context['stock_code']}")
         if effective_context.get("stock_name"):
-            context_parts.append(f"股票名称: {effective_context['stock_name']}")
+            if report_language == "en":
+                context_parts.append(f"Stock name: {effective_context['stock_name']}")
+            else:
+                context_parts.append(f"股票名称: {effective_context['stock_name']}")
         if effective_context.get("previous_price"):
-            context_parts.append(f"上次分析价格: {effective_context['previous_price']}")
+            if report_language == "en":
+                context_parts.append(
+                    f"Last analysis price: {effective_context['previous_price']}"
+                )
+            else:
+                context_parts.append(
+                    f"上次分析价格: {effective_context['previous_price']}"
+                )
         if effective_context.get("previous_change_pct"):
-            context_parts.append(f"上次涨跌幅: {effective_context['previous_change_pct']}%")
+            if report_language == "en":
+                context_parts.append(
+                    f"Last change %: {effective_context['previous_change_pct']}%"
+                )
+            else:
+                context_parts.append(
+                    f"上次涨跌幅: {effective_context['previous_change_pct']}%"
+                )
         if effective_context.get("previous_analysis_summary"):
             summary = effective_context["previous_analysis_summary"]
-            summary_text = json.dumps(summary, ensure_ascii=False) if isinstance(summary, dict) else str(summary)
-            context_parts.append(f"上次分析摘要:\n{summary_text}")
+            summary_text = (
+                json.dumps(summary, ensure_ascii=False)
+                if isinstance(summary, dict)
+                else str(summary)
+            )
+            if report_language == "en":
+                context_parts.append(f"Last analysis summary:\n{summary_text}")
+            else:
+                context_parts.append(f"上次分析摘要:\n{summary_text}")
         if effective_context.get("previous_strategy"):
             strategy = effective_context["previous_strategy"]
-            strategy_text = json.dumps(strategy, ensure_ascii=False) if isinstance(strategy, dict) else str(strategy)
-            context_parts.append(f"上次策略分析:\n{strategy_text}")
+            strategy_text = (
+                json.dumps(strategy, ensure_ascii=False)
+                if isinstance(strategy, dict)
+                else str(strategy)
+            )
+            if report_language == "en":
+                context_parts.append(f"Last strategy analysis:\n{strategy_text}")
+            else:
+                context_parts.append(f"上次策略分析:\n{strategy_text}")
         daily_market_context_section = format_daily_market_context_prompt_section(
             effective_context.get("daily_market_context"),
             report_language=report_language,
@@ -614,18 +670,34 @@ def prepare_agent_chat(
         if market_structure_section:
             context_parts.append(market_structure_section.strip())
         if context_parts:
-            history_messages.extend(
-                [
-                    {
-                        "role": "user",
-                        "content": "[系统提供的历史分析上下文，可供参考对比]\n" + "\n".join(context_parts),
-                    },
-                    {
-                        "role": "assistant",
-                        "content": "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？",
-                    },
-                ]
-            )
+            if report_language == "en":
+                history_messages.extend(
+                    [
+                        {
+                            "role": "user",
+                            "content": "[System-provided historical analysis context for reference]\n"
+                            + "\n".join(context_parts),
+                        },
+                        {
+                            "role": "assistant",
+                            "content": "Understood. I have reviewed the historical analysis data for this stock. What would you like to know?",
+                        },
+                    ]
+                )
+            else:
+                history_messages.extend(
+                    [
+                        {
+                            "role": "user",
+                            "content": "[系统提供的历史分析上下文，可供参考对比]\n"
+                            + "\n".join(context_parts),
+                        },
+                        {
+                            "role": "assistant",
+                            "content": "好的，我已了解该股票的历史分析数据。请告诉我你想了解什么？",
+                        },
+                    ]
+                )
 
     return PreparedAgentChat(
         system_prompt=system_prompt,
@@ -637,6 +709,7 @@ def prepare_agent_chat(
 # ============================================================
 # Agent Executor
 # ============================================================
+
 
 class AgentExecutor:
     """ReAct agent loop with tool calling.
@@ -655,7 +728,7 @@ class AgentExecutor:
         default_skill_policy: str = "",
         use_legacy_default_prompt: bool = False,
         max_steps: int = 10,
-        timeout_seconds: Optional[float] = None,
+        timeout_seconds: float | None = None,
     ):
         self.tool_registry = tool_registry
         self.llm_adapter = llm_adapter
@@ -665,7 +738,7 @@ class AgentExecutor:
         self.max_steps = max_steps
         self.timeout_seconds = timeout_seconds
 
-    def run(self, task: str, context: Optional[Dict[str, Any]] = None) -> AgentResult:
+    def run(self, task: str, context: dict[str, Any] | None = None) -> AgentResult:
         """Execute the agent loop for a given task.
 
         Args:
@@ -676,13 +749,20 @@ class AgentExecutor:
             AgentResult with parsed dashboard or error.
         """
         # Build system prompt with skills
+        report_language = normalize_report_language(
+            (context or {}).get("report_language", "zh")
+        )
         skills_section = ""
         if self.skill_instructions:
-            skills_section = f"## 激活的交易技能\n\n{self.skill_instructions}"
+            if report_language == "en":
+                skills_section = (
+                    f"## Active Trading Skills\n\n{self.skill_instructions}"
+                )
+            else:
+                skills_section = f"## 激活的交易技能\n\n{self.skill_instructions}"
         default_skill_policy_section = ""
         if self.default_skill_policy:
             default_skill_policy_section = f"\n{self.default_skill_policy}\n"
-        report_language = normalize_report_language((context or {}).get("report_language", "zh"))
         stock_code = (context or {}).get("stock_code", "")
         market_role = get_market_role(stock_code, report_language)
         market_guidelines = get_market_guidelines(stock_code, report_language)
@@ -698,19 +778,31 @@ class AgentExecutor:
             skills_section=skills_section,
             language_section=_build_language_section(report_language),
         )
+        if report_language == "en":
+            system_prompt = (
+                _build_language_section(report_language).strip()
+                + "\n\n"
+                + system_prompt
+            )
 
         # Build tool declarations in OpenAI format (litellm handles all providers)
         tool_decls = self.tool_registry.to_openai_tools()
 
         # Initialize conversation
-        messages: List[Dict[str, Any]] = [
+        messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": self._build_user_message(task, context)},
         ]
 
         return self._run_loop(messages, tool_decls, parse_dashboard=True)
 
-    def chat(self, message: str, session_id: str, progress_callback: Optional[Callable] = None, context: Optional[Dict[str, Any]] = None) -> AgentResult:
+    def chat(
+        self,
+        message: str,
+        session_id: str,
+        progress_callback: Callable | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> AgentResult:
         """Execute the agent loop for a free-form chat message.
 
         Args:
@@ -738,7 +830,7 @@ class AgentExecutor:
             use_codex_prompt=False,
             include_provider_trace=True,
         )
-        messages: List[Dict[str, Any]] = [
+        messages: list[dict[str, Any]] = [
             {"role": "system", "content": prepared.system_prompt},
             *prepared.history_messages,
         ]
@@ -760,7 +852,9 @@ class AgentExecutor:
 
         # Persist assistant reply (or error note) for context continuity
         if result.success:
-            assistant_message_id = conversation_manager.add_message(session_id, "assistant", result.content)
+            assistant_message_id = conversation_manager.add_message(
+                session_id, "assistant", result.content
+            )
             self._persist_provider_trace(
                 session_id=session_id,
                 run_id=run_id,
@@ -780,7 +874,7 @@ class AgentExecutor:
         *,
         session_id: str,
         run_id: str,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         baseline_len: int,
         user_message_id: int,
         assistant_message_id: int,
@@ -798,11 +892,11 @@ class AgentExecutor:
 
     def _run_loop(
         self,
-        messages: List[Dict[str, Any]],
-        tool_decls: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
+        tool_decls: list[dict[str, Any]],
         parse_dashboard: bool,
-        progress_callback: Optional[Callable] = None,
-        stock_scope: Optional[StockScope] = None,
+        progress_callback: Callable | None = None,
+        stock_scope: StockScope | None = None,
     ) -> AgentResult:
         """Delegate to the shared runner and adapt the result.
 
@@ -836,7 +930,9 @@ class AgentExecutor:
                 total_tokens=loop_result.total_tokens,
                 provider=loop_result.provider,
                 model=model_str,
-                error=None if dashboard else "Failed to parse dashboard JSON from agent response",
+                error=None
+                if dashboard
+                else "Failed to parse dashboard JSON from agent response",
                 messages=loop_result.messages,
             )
 
@@ -853,21 +949,37 @@ class AgentExecutor:
             messages=loop_result.messages,
         )
 
-    def _build_user_message(self, task: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def _build_user_message(
+        self, task: str, context: dict[str, Any] | None = None
+    ) -> str:
         """Build the initial user message."""
         parts = [task]
         if context:
-            report_language = normalize_report_language(context.get("report_language", "zh"))
+            report_language = normalize_report_language(
+                context.get("report_language", "zh")
+            )
             if context.get("stock_code"):
-                parts.append(f"\n股票代码: {context['stock_code']}")
+                if report_language == "en":
+                    parts.append(f"\nStock code: {context['stock_code']}")
+                else:
+                    parts.append(f"\n股票代码: {context['stock_code']}")
             if context.get("report_type"):
-                parts.append(f"报告类型: {context['report_type']}")
+                if report_language == "en":
+                    parts.append(f"Report type: {context['report_type']}")
+                else:
+                    parts.append(f"报告类型: {context['report_type']}")
             if report_language == "en":
-                parts.append("输出语言: English（所有 JSON 键名保持不变，所有面向用户的文本值使用英文）")
+                parts.append(
+                    "Output language: English (keep all JSON keys unchanged; write all user-facing text values in English)"
+                )
             elif report_language == "ko":
-                parts.append("출력 언어: 한국어（모든 JSON 키는 그대로 유지하고, 사용자 노출 텍스트 값은 한국어로 작성）")
+                parts.append(
+                    "출력 언어: 한국어（모든 JSON 키는 그대로 유지하고, 사용자 노출 텍스트 값은 한국어로 작성）"
+                )
             else:
-                parts.append("输出语言: 中文（所有 JSON 键名保持不变，所有面向用户的文本值使用中文）")
+                parts.append(
+                    "输出语言: 中文（所有 JSON 键名保持不变，所有面向用户的文本值使用中文）"
+                )
 
             market_phase_section = format_market_phase_prompt_section(
                 context.get("market_phase_context"),
@@ -891,16 +1003,50 @@ class AgentExecutor:
                 parts.append(market_structure_section)
 
             analysis_context_pack_summary = context.get("analysis_context_pack_summary")
-            if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
+            if (
+                isinstance(analysis_context_pack_summary, str)
+                and analysis_context_pack_summary
+            ):
                 parts.append(analysis_context_pack_summary)
 
             # Inject pre-fetched context data to avoid redundant fetches
             if context.get("realtime_quote"):
-                parts.append(f"\n[系统已获取的实时行情]\n{json.dumps(context['realtime_quote'], ensure_ascii=False)}")
+                if report_language == "en":
+                    parts.append(
+                        f"\n[Pre-fetched real-time quote]\n{json.dumps(context['realtime_quote'], ensure_ascii=False)}"
+                    )
+                else:
+                    parts.append(
+                        f"\n[系统已获取的实时行情]\n{json.dumps(context['realtime_quote'], ensure_ascii=False)}"
+                    )
             if context.get("chip_distribution"):
-                parts.append(f"\n[系统已获取的筹码分布]\n{json.dumps(context['chip_distribution'], ensure_ascii=False)}")
+                if report_language == "en":
+                    parts.append(
+                        f"\n[Pre-fetched chip distribution]\n{json.dumps(context['chip_distribution'], ensure_ascii=False)}"
+                    )
+                else:
+                    parts.append(
+                        f"\n[系统已获取的筹码分布]\n{json.dumps(context['chip_distribution'], ensure_ascii=False)}"
+                    )
             if context.get("news_context"):
-                parts.append(f"\n[系统已获取的新闻与舆情情报]\n{context['news_context']}")
+                if report_language == "en":
+                    parts.append(
+                        f"\n[Pre-fetched news and intelligence]\n{context['news_context']}"
+                    )
+                else:
+                    parts.append(
+                        f"\n[系统已获取的新闻与舆情情报]\n{context['news_context']}"
+                    )
 
-        parts.append("\n请使用可用工具获取缺失的数据（如历史K线、新闻等），然后以决策仪表盘 JSON 格式输出分析结果。")
+        _final_lang = normalize_report_language(
+            (context or {}).get("report_language", "zh")
+        )
+        if _final_lang == "en":
+            parts.append(
+                "\nUse available tools to fetch any missing data (e.g. historical bars, news), then output the analysis result in Decision Dashboard JSON format."
+            )
+        else:
+            parts.append(
+                "\n请使用可用工具获取缺失的数据（如历史K线、新闻等），然后以决策仪表盘 JSON 格式输出分析结果。"
+            )
         return "\n".join(parts)
