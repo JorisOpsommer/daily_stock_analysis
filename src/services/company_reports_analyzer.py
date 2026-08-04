@@ -475,10 +475,13 @@ class CompanyReportsAnalyzer:
         models sometimes still emit them (Feishu/Telegram/web render KaTeX on
         those), so we defensively collapse `\\(` -> `(`, `\\)` -> `)`, `\\$` ->
         `$`, `\\%` -> `%`, `\\&` -> `&`, `\\_` -> `_`, etc. anywhere they appear.
+        Uses `\\+` to consume ALL consecutive backslashes before a special char
+        in one pass, so `\\\\(` (double-backslash emitted by some models) does
+        not survive as a single remaining `\\(`.
         """
         if "\\" not in text:
             return text
-        return re.sub(r"\\([()$%&_#{}~^|<>+=\-*/!.,:;])", r"\1", text)
+        return re.sub(r"\\+([()$%&_#{}~^|<>+=\-*/!.,:;])", r"\1", text)
 
     @staticmethod
     def _format_number(value: float) -> str:

@@ -223,10 +223,14 @@ class CompanyReportsTableGenerator:
     @staticmethod
     def _sanitize_latex_escapes(text: str) -> str:
         """Strip LaTeX escape backslashes so downstream renderers never treat
-        table text as math. Mirrors the analyzer's defensive sanitizer."""
+        table text as math. Mirrors the analyzer's defensive sanitizer.
+        Uses `\\+` to consume ALL consecutive backslashes before a special char
+        in one pass, so double-backslash sequences emitted by some models do
+        not survive as a single remaining `\\(`.
+        """
         if "\\" not in text:
             return text
-        return re.sub(r"\\([()$%&_#{}~^|<>+=\-*/!.,:;])", r"\1", text)
+        return re.sub(r"\\+([()$%&_#{}~^|<>+=\-*/!.,:;])", r"\1", text)
 
 
 # Shared data conventions embedded in every table prompt (kept identical to the

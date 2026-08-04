@@ -17,6 +17,7 @@ A股自选股智能分析系统 - 通知层
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -2695,6 +2696,11 @@ class NotificationService(
         text = (getattr(result, "company_reports_analysis", "") or "").strip()
         if not text:
             return
+        # Strip LaTeX-style backslash escapes that some models emit (e.g. \( → ().
+        # Applied here as a last-resort defense so cached/stored results are also
+        # cleaned regardless of when the analyzer ran.
+        if "\\" in text:
+            text = re.sub(r"\\+([()$%&_#{}~^|<>+=\-*/!.,:;])", r"\1", text)
         heading = labels.get("company_reports_heading", "Company Reports (SEC 10-Q)")
         lines.extend(
             [
