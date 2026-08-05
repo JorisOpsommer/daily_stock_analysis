@@ -1489,10 +1489,6 @@ class NotificationService(
                 # ========== 核心结论 ==========
                 core = dashboard.get("core_conclusion", {}) if dashboard else {}
                 one_sentence = core.get("one_sentence", result.analysis_summary)
-                time_sense = core.get(
-                    "time_sensitivity", labels["default_time_sensitivity"]
-                )
-                pos_advice = core.get("position_advice", {})
 
                 report_lines.extend(
                     [
@@ -1502,22 +1498,9 @@ class NotificationService(
                         "",
                         f"> **{labels['one_sentence_label']}**: {one_sentence}",
                         "",
-                        f"⏰ **{labels['time_sensitivity_label']}**: {time_sense}",
-                        "",
                     ]
                 )
                 # 持仓分类建议
-                if pos_advice:
-                    report_lines.extend(
-                        [
-                            f"| {labels['position_status_label']} | {labels['action_advice_label']} |",
-                            "|---------|---------|",
-                            f"| 🆕 **{labels['no_position_label']}** | {pos_advice.get('no_position', self._get_display_operation_advice(result, report_language))} |",
-                            f"| 💼 **{labels['has_position_label']}** | {pos_advice.get('has_position', labels['continue_holding'])} |",
-                            "",
-                        ]
-                    )
-
                 self._append_market_snapshot(report_lines, result)
 
                 # ========== 数据透视 ==========
@@ -1646,18 +1629,6 @@ class NotificationService(
                                 "",
                             ]
                         )
-                    # 检查清单
-                    checklist = battle.get("action_checklist", []) if battle else []
-                    if checklist:
-                        report_lines.extend(
-                            [
-                                f"**✅ {labels['checklist_heading']}**",
-                                "",
-                            ]
-                        )
-                        for item in checklist:
-                            report_lines.append(f"- {item}")
-                        report_lines.append("")
 
                 # ========== 信号归因分析 ==========
                 signal_attr = (
@@ -1968,21 +1939,6 @@ class NotificationService(
                     if summary:
                         lines.append(summary[:80])
                     lines.append("")
-
-                # 检查清单简化版
-                checklist = battle.get("action_checklist", []) if battle else []
-                if checklist:
-                    # 只显示不通过的项目
-                    failed_checks = [
-                        str(c)
-                        for c in checklist
-                        if str(c).startswith("❌") or str(c).startswith("⚠️")
-                    ]
-                    if failed_checks:
-                        lines.append(f"**{labels['failed_checks_heading']}**:")
-                        for check in failed_checks[:3]:
-                            lines.append(f"   {check[:40]}")
-                        lines.append("")
 
                 lines.append("---")
                 lines.append("")
@@ -2615,14 +2571,10 @@ class NotificationService(
         results (e.g. HK/US markets, ETF, or AkShare outages).
         """
         blocks = self._get_fundamental_blocks(result)
-        report_language = self._get_report_language(result)
-        labels = get_report_labels(report_language)
+        labels = get_report_labels(self._get_report_language(result))
 
-        self._append_financial_summary(lines, blocks, labels, report_language)
         self._append_company_reports_block(lines, result, labels)
-        self._append_shareholder_return(lines, blocks, labels, report_language)
         self._append_institutional_flow(lines, blocks, labels)
-        self._append_related_boards(lines, blocks, labels)
 
     def _append_financial_summary(
         self,
