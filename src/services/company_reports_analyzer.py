@@ -360,6 +360,7 @@ class CompanyReportsAnalyzer:
             "Some formatting requirements: \n"
             "- Keep bullets tight: one line where possible, up to three where the data requires it — plain ASCII, no LaTeX escapes."
             "- Use `####` subtitles only (the six step names plus 'Key Findings in report' and 'Biggest Risk'); do not use any other heading level.\n"
+            "- Add a single relevant emoji to the start of each `####` subtitle so the sections read nicely (e.g. '#### 🔎 Key Findings in report', '#### 🏰 Business Quality & Moat Signals').\n"
             "- Return the Markdown body only: no top-level heading, no code fence, no preamble, and nothing after the biggest-risk line. \n"
             "- Use plain ASCII parentheses ( and ). NEVER write \\( or \\) — those are LaTeX "
             "- Use plain % (not \\%), plain $ (not \\$), plain & (not \\&).\n"
