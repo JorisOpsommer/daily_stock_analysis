@@ -30,7 +30,9 @@ except ModuleNotFoundError:
 
 from src.agent.executor import (
     AGENT_SYSTEM_PROMPT,
+    AGENT_SYSTEM_PROMPT_EN,
     LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT,
+    LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT_EN,
     AgentExecutor,
     AgentResult,
 )
@@ -180,6 +182,23 @@ def test_agent_system_prompts_require_phase_decision_contract() -> None:
         assert '"data_limitations"' in prompt
         assert "quote/daily_bars/technical 存在 stale、fallback、missing、fetch_failed、partial 或 estimated" in prompt
         assert "`confidence_level` 不得为高" in prompt
+
+
+def test_agent_system_prompts_en_keep_contract_and_have_no_chinese() -> None:
+    for prompt in (LEGACY_DEFAULT_AGENT_SYSTEM_PROMPT_EN, AGENT_SYSTEM_PROMPT_EN):
+        assert '"phase_decision"' in prompt
+        assert '"watch_conditions"' in prompt
+        assert '"data_limitations"' in prompt
+        assert "quote/daily_bars/technical is stale, fallback, missing, fetch_failed, partial, or estimated" in prompt
+        assert "`confidence_level` must not be High" in prompt
+        assert "## Workflow" in prompt
+        assert "Phase 1" in prompt
+        assert "## Output Format: Decision Dashboard JSON" in prompt
+        assert "Strongly Bullish" in prompt
+        assert "Company name" in prompt
+        assert "股票" not in prompt
+        assert "中文" not in prompt
+        assert "必须" not in prompt
 
 
 # ============================================================
