@@ -180,7 +180,7 @@ _DECISION_DASHBOARD_JSON_SCHEMA_ZH_SYSTEM = """{
         },
 
         "intelligence": {
-            "latest_news": "【最新消息】近期重要新闻摘要",
+            "latest_news": "近期对股价最有影响的几条最重要新闻，用换行分隔成2-4条要点，每条以日期开头（YYYY-MM-DD）",
             "risk_alerts": ["风险点1：具体描述", "风险点2：具体描述"],
             "positive_catalysts": ["利好1：具体描述", "利好2：具体描述"],
             "earnings_outlook": "业绩预期分析（基于年报预告、业绩快报等）",
@@ -304,7 +304,7 @@ _DECISION_DASHBOARD_JSON_SCHEMA_EN = """{
         },
 
         "intelligence": {
-            "latest_news": "[Latest news] summary of recent important news",
+            "latest_news": "The most important recent news affecting the stock price, as 2-4 newline-separated dated bullets (each starting with YYYY-MM-DD)",
             "risk_alerts": ["Risk point 1: specific description", "Risk point 2: specific description"],
             "positive_catalysts": ["Catalyst 1: specific description", "Catalyst 2: specific description"],
             "earnings_outlook": "earnings outlook analysis (based on annual forecasts, earnings flash reports, etc.)",
@@ -428,7 +428,7 @@ _DECISION_DASHBOARD_JSON_SCHEMA_ZH_LEGACY = """{
         },
 
         "intelligence": {
-            "latest_news": "【最新消息】近期重要新闻摘要",
+            "latest_news": "近期对股价最有影响的几条最重要新闻，用换行分隔成2-4条要点，每条以日期开头（YYYY-MM-DD）",
             "risk_alerts": ["风险点1：具体描述", "风险点2：具体描述"],
             "positive_catalysts": ["利好1：具体描述", "利好2：具体描述"],
             "earnings_outlook": "业绩预期分析（基于年报预告、业绩快报等）",
@@ -2636,7 +2636,7 @@ class GeminiAnalyzer:
         },
 
         "intelligence": {
-            "latest_news": "【最新消息】近期重要新闻摘要",
+            "latest_news": "近期对股价最有影响的几条最重要新闻，用换行分隔成2-4条要点，每条以日期开头（YYYY-MM-DD）",
             "risk_alerts": ["风险点1：具体描述", "风险点2：具体描述"],
             "positive_catalysts": ["利好1：具体描述", "利好2：具体描述"],
             "earnings_outlook": "业绩预期分析（基于年报预告、业绩快报等）",
@@ -2828,7 +2828,7 @@ class GeminiAnalyzer:
         },
 
         "intelligence": {
-            "latest_news": "【最新消息】近期重要新闻摘要",
+            "latest_news": "近期对股价最有影响的几条最重要新闻，用换行分隔成2-4条要点，每条以日期开头（YYYY-MM-DD）",
             "risk_alerts": ["风险点1：具体描述", "风险点2：具体描述"],
             "positive_catalysts": ["利好1：具体描述", "利好2：具体描述"],
             "earnings_outlook": "业绩预期分析（基于年报预告、业绩快报等）",
@@ -5072,6 +5072,7 @@ class GeminiAnalyzer:
    - 输出到 `risk_alerts` / `positive_catalysts` / `latest_news` 的每一条都必须带具体日期（YYYY-MM-DD）
    - 超出近{news_window_days}日窗口的新闻一律忽略
    - 时间未知、无法确定发布日期的新闻一律忽略
+5. 📌 **`latest_news` 输出格式**：只从上述搜索结果中挑选对股价最有影响的 2-4 条最重要新闻（像巴菲特那样关注“今天对股价有用的发生了什么”），在 `latest_news` 这一个字段内用换行分隔成多条要点，每条以日期开头（YYYY-MM-DD）；仅做提炼，不要新增联网搜索。
 
 ```
 {news_context}
@@ -5142,6 +5143,7 @@ class GeminiAnalyzer:
 - **具体狙击点位**：买入价、止损价、目标价（精确到分）
 - **检查清单**：每项用 ✅/⚠️/❌ 标记
 - **消息面时间合规**：`latest_news`、`risk_alerts`、`positive_catalysts` 不得包含超出近{news_window_days}日或时间未知的信息
+- **`latest_news` 格式**：必须是 2-4 条对股价最有影响的重要新闻，用换行分隔成多条要点，每条以日期开头（YYYY-MM-DD），只提炼上方已有搜索结果，不做额外联网搜索
 - **技术面一致性**：严禁把“空头排列”和“多头排列”等互斥结论同时当作有效依据；若基本面/事件面与技术面冲突，必须明确写“事件先行、技术待确认”或“基本面偏多，但技术面尚未确认”
  
 请输出完整的 JSON 格式决策仪表盘。"""

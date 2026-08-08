@@ -1184,6 +1184,13 @@ class Config:
     # === 公司报告（SEC EDGAR 10-Q + LLM 分析）===
     # 全局开关；默认关闭，避免升级后行为变化。仅对美股（is_us_stock_code）生效。
     include_company_reports: bool = False
+    # 是否在公司报告生成后将其追加到通知消息中（"公司报告"叙述分析块）；
+    # 独立于 include_company_reports，可在生成但不在通知中展示。默认开启，
+    # 保持原有行为（开启 include_company_reports 后即会出现在通知里）。
+    include_company_reports_in_notification: bool = True
+    # 是否将"公司报告数据表"（company_reports_table，SEC 10-Q 表格概览）
+    # 追加到通知消息中；默认开启，可与上述叙述块独立控制。
+    include_company_reports_table_in_notification: bool = True
     # SEC EDGAR 要求每次请求携带识别邮箱；未配置时功能会跳过并给出一次性告警。
     sec_edgar_identity: str | None = None
     # 拉取的 10-Q 数量（1-8 之间由代码 clamp）
@@ -2440,6 +2447,14 @@ class Config:
                 "INCLUDE_COMPANY_REPORTS", "false"
             ).lower()
             == "true",
+            include_company_reports_in_notification=os.getenv(
+                "INCLUDE_COMPANY_REPORTS_IN_NOTIFICATION", "true"
+            ).lower()
+            != "false",
+            include_company_reports_table_in_notification=os.getenv(
+                "INCLUDE_COMPANY_REPORTS_TABLE_IN_NOTIFICATION", "true"
+            ).lower()
+            != "false",
             sec_edgar_identity=(os.getenv("SEC_EDGAR_IDENTITY") or "").strip() or None,
             company_reports_filing_count=parse_env_int(
                 os.getenv("COMPANY_REPORTS_FILING_COUNT"),

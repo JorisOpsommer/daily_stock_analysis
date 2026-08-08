@@ -2487,6 +2487,7 @@ class NotificationService(
         labels = get_report_labels(self._get_report_language(result))
 
         self._append_company_reports_block(lines, result, labels)
+        self._append_company_reports_table_block(lines, result, labels)
         self._append_institutional_flow(lines, blocks, labels)
 
     def _append_financial_summary(
@@ -2553,11 +2554,16 @@ class NotificationService(
     ) -> None:
         """Append the SEC EDGAR company-reports LLM analysis block.
 
-        Rendered only when `INCLUDE_COMPANY_REPORTS=true`, the ticker was a US
+        Rendered only when `INCLUDE_COMPANY_REPORTS=true` and
+        `INCLUDE_COMPANY_REPORTS_IN_NOTIFICATION=true`, the ticker was a US
         stock, and the LLM produced non-empty text. Kept short (heading + body)
         so it slots naturally between the Financial Summary and Shareholder
         Return sections.
         """
+        if not getattr(
+            self._config, "include_company_reports_in_notification", True
+        ):
+            return
         text = (getattr(result, "company_reports_analysis", "") or "").strip()
         if not text:
             return
@@ -2570,6 +2576,43 @@ class NotificationService(
         lines.extend(
             [
                 f"### 📑 {heading}",
+                "",
+                text,
+                "",
+            ]
+        )
+
+    def _append_company_reports_table_block(
+        self,
+        lines: list[str],
+        result: AnalysisResult,
+        labels: dict[str, str],
+    ) -> None:
+        """Append the SEC EDGAR company-reports data-table block.
+
+        Rendered only when `INCLUDE_COMPANY_REPORTS=true` and
+        `INCLUDE_COMPANY_REPORTS_TABLE_IN_NOTIFICATION=true`, the ticker was a
+        US stock, and the LLM produced non-empty Markdown tables. Placed right
+        after the narrative company-reports block so both stay together between
+        the Financial Summary and Shareholder Return sections.
+        """
+        if not getattr(
+            self._config, "include_company_reports_table_in_notification", True
+        ):
+            return
+        text = (getattr(result, "company_reports_table", "") or "").strip()
+        if not text:
+            return
+        # Mirror the narrative block: strip LaTeX-style backslash escapes emitted
+        # by some models so cached/stored tables render cleanly.
+        if "\\" in text:
+            text = re.sub(r"\\+([()$%&_#{}~^|<>+=\-*/!.,:;])", r"\1", text)
+        heading = labels.get(
+            "company_reports_table_heading", "Company Reports Data Table (SEC 10-Q)"
+        )
+        lines.extend(
+            [
+                f"### 📊 {heading}",
                 "",
                 text,
                 "",
