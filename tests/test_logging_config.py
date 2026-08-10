@@ -5,7 +5,7 @@ import logging
 
 import pytest
 
-from src.logging_config import LITELLM_LOGGERS, setup_logging
+from src.logging_config import LITELLM_LOGGERS, DailyRotatingFileHandler, setup_logging
 
 
 @pytest.fixture(autouse=True)
@@ -101,3 +101,48 @@ def test_invalid_litellm_log_level_falls_back_to_warning(tmp_path, monkeypatch):
     assert "invalid level warning should remain" in debug_log_text
     assert "LITELLM_LOG_LEVEL" in debug_log_text
     assert "已回退为 WARNING" in debug_log_text
+
+
+def test_daily_rotating_handler_rolls_to_new_dated_file_on_day_change(tmp_path):
+    handler = DailyRotatingFileHandler(
+        tmp_path, prefix="stock_analysis", backup_count=5, encoding="utf-8"
+    )
+    handler.setLevel(logging.INFO)
+    logger = logging.getLogger("test_daily_rotation")
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    logger.propagate = False
+    current_day = handler._current_day()
+
+    logger.info("same day line")
+
+    # 模拟日期变更：伪造内部记录的日期为过去，下一次 emit 应滚动到新日期文件
+    handler._today = "19000101"
+    logger.info("after midnight line")
+
+    files = sorted(p.name for p in tmp_path.glob("stock_analysis_*.log"))
+    assert any(f == f"stock_analysis_{current_day}.log" for f in files)
+    target = next(p for p in tmp_path.glob(f"stock_analysis_{current_day}.log"))
+    assert "same day line" in target.read_text(encoding="utf-8")
+    assert "after midnight line" in target.read_text(encoding="utf-8")
+    handler.close()
+
+
+def test_daily_rotating_handler_prunes_old_files_beyond_backup_count(tmp_path):
+    for day in ["20260101", "20260102", "20260103", "20260104", "20260105"]:
+        (tmp_path / f"stock_analysis_{day}.log").write_text("old", encoding="utf-8")
+
+    handler = DailyRotatingFileHandler(
+        tmp_path, prefix="stock_analysis", backup_count=3, encoding="utf-8"
+    )
+    handler.setLevel(logging.INFO)
+    logger = logging.getLogger("test_daily_rotation_prune")
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    logger.propagate = False
+
+    logger.info("new line")
+
+    files = sorted(p.name for p in tmp_path.glob("stock_analysis_*.log"))
+    assert len(files) == 3, files
+    handler.close()

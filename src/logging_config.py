@@ -14,7 +14,7 @@ import logging
 import os
 import sys
 from datetime import datetime
-from logging.handlers import RotatingFileHandler
+from logging.handlers import BaseRotatingHandler
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -47,6 +47,71 @@ class RelativePathFormatter(logging.Formatter):
             pass
         return super().format(record)
 
+
+class DailyRotatingFileHandler(BaseRotatingHandler):
+    """按本地日期轮转的日志处理器。
+
+    日志文件名始终以当天日期命名（``app_YYYYMMDD.log``），当本地日期
+    发生变化（通常是跨天，例如 08-07 -> 08-08）时自动滚动到新文件，
+    新文件以新日期命名。这样即使进程长期运行（如服务端），也会在跨天时
+    自动创建新一天的日志文件，而不是一直写入同一天文件。
+
+    默认仅保留最近 ``backup_count`` 个日期文件（0 表示不限），删除更早的旧文件。
+    """
+
+    def __init__(
+        self,
+        log_dir: Path,
+        prefix: str,
+        backup_count: int = 0,
+        encoding: str = 'utf-8',
+    ):
+        self._log_dir = Path(log_dir)
+        self._prefix = prefix
+        self._backup_count = backup_count
+        self._today = self._current_day()
+        super().__init__(
+            filename=str(self._build_filename(self._today)),
+            mode='a',
+            encoding=encoding,
+        )
+        self._prune_old_files()
+
+    @staticmethod
+    def _current_day() -> str:
+        return datetime.now().strftime('%Y%m%d')
+
+    def _build_filename(self, day: str) -> Path:
+        return self._log_dir / f"{self._prefix}_{day}.log"
+
+    def shouldRollover(self, record) -> bool:
+        return self._current_day() != self._today
+
+    def doRollover(self) -> None:
+        if self.stream:
+            self.stream.close()
+            self.stream = None
+        self._today = self._current_day()
+        self.baseFilename = str(self._build_filename(self._today))
+        if self.mode in ('w', 'wb'):
+            self.stream = open(self.baseFilename, self.mode)
+        else:
+            self.stream = open(self.baseFilename, self.mode, encoding=self.encoding)
+        self._prune_old_files()
+
+    def _prune_old_files(self) -> None:
+        if self._backup_count <= 0:
+            return
+        pattern = f"{self._prefix}_*.log"
+        matches = sorted(
+            self._log_dir.glob(pattern),
+            key=lambda p: p.name,
+        )
+        for old in matches[: -self._backup_count]:
+            try:
+                old.unlink()
+            except OSError:
+                pass
 
 
 # 默认需要降低日志级别的第三方库
@@ -92,8 +157,8 @@ def setup_logging(
 
     配置三层日志输出：
     1. 控制台：根据 debug 参数或 console_level 设置级别
-    2. 常规日志文件：INFO 级别，10MB 轮转，保留 5 个备份
-    3. 调试日志文件：DEBUG 级别，50MB 轮转，保留 3 个备份
+    2. 常规日志文件：INFO 级别，按日期轮转（每天一个新文件，默认保留 5 个）
+    3. 调试日志文件：DEBUG 级别，按日期轮转（每天一个新文件，默认保留 3 个）
 
     Args:
         log_prefix: 日志文件名前缀（如 "api_server" -> api_server_20240101.log）
@@ -135,22 +200,22 @@ def setup_logging(
     console_handler.setFormatter(rel_formatter)
     root_logger.addHandler(console_handler)
 
-    # Handler 2: 常规日志文件（INFO 级别，10MB 轮转）
-    file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=10 * 1024 * 1024,  # 10MB
-        backupCount=5,
+    # Handler 2: 常规日志文件（INFO 级别，按日期轮转）
+    file_handler = DailyRotatingFileHandler(
+        log_path,
+        prefix=log_prefix,
+        backup_count=5,
         encoding='utf-8'
     )
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(rel_formatter)
     root_logger.addHandler(file_handler)
 
-    # Handler 3: 调试日志文件（DEBUG 级别，包含所有详细信息）
-    debug_handler = RotatingFileHandler(
-        debug_log_file,
-        maxBytes=50 * 1024 * 1024,  # 50MB
-        backupCount=3,
+    # Handler 3: 调试日志文件（DEBUG 级别，按日期轮转）
+    debug_handler = DailyRotatingFileHandler(
+        log_path,
+        prefix=f"{log_prefix}_debug",
+        backup_count=3,
         encoding='utf-8'
     )
     debug_handler.setLevel(logging.DEBUG)

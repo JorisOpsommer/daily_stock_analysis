@@ -1399,6 +1399,8 @@ python main.py --debug
 - 常规日志：`logs/stock_analysis_YYYYMMDD.log`
 - 调试日志：`logs/stock_analysis_debug_YYYYMMDD.log`
 
+日志文件按本地日期轮转：当系统日期发生变化时（例如 08-07 跨到 08-08），会自动创建新一天的日志文件并将后续内容写入新文件；即使进程长期运行也会在跨天时自动切换。常规日志默认保留最近 5 个日期文件，调试日志默认保留最近 3 个日期文件，更早的文件会自动清理。
+
 调试日志默认保留项目自身 DEBUG 信息，但会将 LiteLLM 内部日志压低到 `WARNING`，避免流式生成时按 token 写入大量第三方调试日志；如需排查 LiteLLM 内部细节，可在 `.env` 中临时设置 `LITELLM_LOG_LEVEL=DEBUG`。
 
 ### SQLite 写入稳态配置
