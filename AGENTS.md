@@ -1,5 +1,35 @@
 # AGENTS.md
 
+## Graphify — Mandatory
+
+Graphify is a required **skill tool** in this project and the **primary way to navigate and understand the codebase**.
+
+**Whenever you need to search, navigate, understand, or locate anything in the codebase, you MUST invoke the Graphify skill FIRST — as a skill tool call, not as a shell command.**
+
+Do NOT run `graphify` via bash/shell. Invoke it through the skill tool interface provided by the agent framework.
+
+Always read and follow the Graphify skill instructions before performing codebase searches or navigation.
+
+Use Graphify to:
+
+1. Locate relevant files, directories, symbols, functions, classes, types, components, and code paths.
+2. Understand how existing functionality is implemented, including relationships, dependencies, usages, and code paths.
+3. Determine which files and locations need to be edited.
+4. Inspect related or affected code before making changes, including when refactoring, moving code, or investigating bugs.
+5. Verify the potential impact of changes when appropriate.
+
+Do not guess file paths, symbols, dependencies, or edit locations when Graphify can determine them.
+
+Do NOT use `grep`, `rg`, `find`, `ag`, shell pipelines, or IDE search to locate code when Graphify can answer the question. These are **last-resort fallbacks only**, permitted only when Graphify explicitly returns no result.
+
+Do not chain bash commands as a workaround to bypass these restrictions. A command pipeline that starts with an allowed command (e.g. `echo`) and appends `grep` or `find` via `&&` or `;` is still a policy violation.
+
+If Graphify is unavailable or cannot answer the question, explicitly acknowledge this before falling back to another search method.
+
+Do not claim to have used Graphify if you did not.
+
+---
+
 This file governs the default development workflow for this repository, with the goal of reducing repetitive communication, reducing rework, and keeping changes aligned with the current project structure.
 
 If this file is inconsistent with the repository's scripts, workflows, or actual code, defer to what is actually executable, and fix the documentation in the relevant change to prevent the rules from continuing to drift.
@@ -270,16 +300,3 @@ CI passing only shows that automated checks passed; it cannot replace human sema
 - Auto-tagging is not triggered by default; version number updates only trigger when a commit title contains `#patch`, `#minor`, or `#major`.
 - Manual tags must use annotated tags.
 - User-visible changes should preferably be merged via PR, with labels and verification notes completed.
-
-## graphify
-
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
-
-When the user types `/graphify`, invoke the `skill` tool with `skill: "graphify"` before doing anything else.
-
-Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
-- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
