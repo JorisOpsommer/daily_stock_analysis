@@ -17,6 +17,7 @@ A股自选股智能分析系统 - 通知层
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 from dataclasses import dataclass, field
@@ -327,6 +328,13 @@ class NotificationService(
 
         # 仅分析结果摘要（Issue #262）：true 时只推送汇总，不含个股详情
         self._report_summary_only = getattr(config, "report_summary_only", False)
+        # 精简通知（Issue #xxx）：true 时隐藏狙击点位的理想买点/次优买点
+        self._notification_short = os.getenv("NOTIFICATION_SHORT", "false").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+            "on",
+        )
         self._report_show_llm_model = getattr(config, "report_show_llm_model", True)
         self._history_compare_cache: dict[
             tuple[int, str, tuple[tuple[str, str], ...]],
@@ -1518,16 +1526,22 @@ class NotificationService(
                     # 狙击点位
                     sniper = battle.get("sniper_points", {})
                     if sniper:
+                        rows = [
+                            f"| 🛑 {labels['stop_loss_label']} | {self._clean_sniper_value(sniper.get('stop_loss', 'N/A'))} |",
+                            f"| 🎊 {labels['take_profit_label']} | {self._clean_sniper_value(sniper.get('take_profit', 'N/A'))} |",
+                        ]
+                        if not self._notification_short:
+                            rows[0:0] = [
+                                f"| 🎯 {labels['ideal_buy_label']} | {self._clean_sniper_value(sniper.get('ideal_buy', 'N/A'))} |",
+                                f"| 🔵 {labels['secondary_buy_label']} | {self._clean_sniper_value(sniper.get('secondary_buy', 'N/A'))} |",
+                            ]
                         report_lines.extend(
                             [
                                 f"**📍 {labels['action_points_heading']}**",
                                 "",
                                 f"| {labels['action_points_heading']} | {labels['current_price_label']} |",
                                 "|---------|------|",
-                                f"| 🎯 {labels['ideal_buy_label']} | {self._clean_sniper_value(sniper.get('ideal_buy', 'N/A'))} |",
-                                f"| 🔵 {labels['secondary_buy_label']} | {self._clean_sniper_value(sniper.get('secondary_buy', 'N/A'))} |",
-                                f"| 🛑 {labels['stop_loss_label']} | {self._clean_sniper_value(sniper.get('stop_loss', 'N/A'))} |",
-                                f"| 🎊 {labels['take_profit_label']} | {self._clean_sniper_value(sniper.get('take_profit', 'N/A'))} |",
+                                *rows,
                                 "",
                             ]
                         )
@@ -1800,7 +1814,7 @@ class NotificationService(
                     stop_loss = str(sniper.get("stop_loss", ""))
                     take_profit = str(sniper.get("take_profit", ""))
                     points = []
-                    if ideal_buy:
+                    if ideal_buy and not self._notification_short:
                         points.append(f"🎯{labels['ideal_buy_label']}:{ideal_buy[:15]}")
                     if stop_loss:
                         points.append(f"🛑{labels['stop_loss_label']}:{stop_loss[:15]}")
@@ -2127,19 +2141,25 @@ class NotificationService(
         # 狙击点位
         sniper = battle.get("sniper_points", {}) if battle else {}
         if sniper:
+            headers = []
+            cells = []
+            if not self._notification_short:
+                headers.append(str(labels['ideal_buy_label']))
+                cells.append(str(sniper.get("ideal_buy", "-")))
+            headers.append(str(labels['stop_loss_label']))
+            headers.append(str(labels['take_profit_label']))
+            cells.append(str(sniper.get("stop_loss", "-")))
+            cells.append(str(sniper.get("take_profit", "-")))
             lines.extend(
                 [
                     f"### 🎯 {labels['action_points_heading']}",
                     "",
-                    f"| {labels['ideal_buy_label']} | {labels['stop_loss_label']} | {labels['take_profit_label']} |",
-                    "|------|------|------|",
+                    f"| {' | '.join(headers)} |",
+                    f"|{'|'.join('------' for _ in headers)}|",
+                    f"| {' | '.join(cells)} |",
+                    "",
                 ]
             )
-            ideal_buy = sniper.get("ideal_buy", "-")
-            stop_loss = sniper.get("stop_loss", "-")
-            take_profit = sniper.get("take_profit", "-")
-            lines.append(f"| {ideal_buy} | {stop_loss} | {take_profit} |")
-            lines.append("")
 
         # ========== 信号归因分析 ==========
         signal_attr = dashboard.get("signal_attribution", {}) if dashboard else {}

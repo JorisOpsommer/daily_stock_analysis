@@ -3,8 +3,25 @@
   "plugin": [
     "file:///Users/303705/Documents/dev/joris/daily_stock_analysis/.kilo/plugins/graphify.js"
   ],
+  "permission": {
+    "bash": {
+      "*": "deny",
+      "grep *": "deny",
+      "graphify *": "allow",
+      "cat *": "allow",
+      "python *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git fetch*": "allow",
+      "npm *": "allow",
+      "cd *": "allow",
+      "ls *": "allow",
+      "echo *": "allow"
+    }
+  },
   "instructions": [
-    "Always try to use the 'graphify' tools (graphify query, graphify path, graphify explain) first when exploring codebase architecture, multi-file relationships, or dependencies.",
-    "Default to graphify as your primary search method. You are still allowed to use 'grep' or 'find' as a secondary fallback if graphify does not return the needed information or if a specific string literal match is required."
+    "You do NOT have access to grep, find, rg, or any search commands. To find code, use ONLY: graphify query \"<question>\", graphify path \"<A>\" \"<B>\", or graphify explain \"<concept>\".",
+    "graphify-out/graph.json exists in this project. Always use graphify tools for codebase exploration."
   ]
 }
