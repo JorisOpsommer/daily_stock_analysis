@@ -1210,6 +1210,23 @@ class NotificationService(
                 return value[len(prefix) :]
         return value
 
+    @staticmethod
+    def _shorten_ma_alignment(value: Any) -> str:
+        """Return a compact MA alignment description for short notifications."""
+        text = str(value or "").strip()
+        if not text:
+            return text
+        for separator in (":", "，", ",", "；", ";"):
+            if separator not in text:
+                continue
+            head = text.split(separator, 1)[0].strip()
+            if head:
+                return head
+        cut = re.search(r"\sMA\d+[<>≥≤=]", text)
+        if cut:
+            return text[: cut.start()].strip()
+        return text
+
     def _append_phase_decision_block(
         self,
         report_lines: list[str],
@@ -1477,9 +1494,14 @@ class NotificationService(
                             if trend_data.get("is_bullish", False)
                             else f"❌ {labels['no_label']}"
                         )
+                        ma_alignment_text = trend_data.get("ma_alignment", "N/A")
+                        if self._notification_short:
+                            ma_alignment_text = self._shorten_ma_alignment(
+                                ma_alignment_text
+                            )
                         report_lines.extend(
                             [
-                                f"**{labels['ma_alignment_label']}**: {trend_data.get('ma_alignment', 'N/A')} | "
+                                f"**{labels['ma_alignment_label']}**: {ma_alignment_text} | "
                                 f"{labels['bullish_alignment_label']}: {is_bullish} | "
                                 f"{labels['trend_strength_label']}: {trend_data.get('trend_score', 'N/A')}/100",
                                 "",

@@ -47,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - [新功能] 新增按 individual SkillAgent 自身 signal、版本化 engine 与本地已存同源日线窗口计算并持久化 `skill_opinion_outcomes` 的核心服务；本阶段不提供管理员 API、表现统计、样本充足度或权重调整。
 - [新功能] 新增 `INCLUDE_COMPANY_REPORTS` opt-in：启用后仅对美股通过 edgartools 拉取最近若干份 SEC 10-Q，并复用当前配置的 LLM 生成"公司报告"分析块，追加到通知消息中 💼 财务摘要 之后；需配置 `SEC_EDGAR_IDENTITY`，A 股/港股等其它市场静默跳过，失败全链路 fail-open。
 - [改进] OpenRouter 渠道请求自动携带 `X-Title: daily_stock_analysis` 与 `HTTP-Referer` 标头，使 OpenRouter 仪表盘中的应用标识从 "unknown" 显示为 "daily_stock_analysis"；对 channel、legacy OpenAI 与视觉提取路径均生效，无需额外配置。
+- [改进] `NOTIFICATION_SHORT=true` 时通知中 📊 数据透视（Data View）的均线排列描述改为只保留前导摘要（如 `Strong bearish stacking` / `多头排列`），省略逐条 MA 数值与发散细节，缩短通知长度；Web/API 端的展示保持不变。
   <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
   <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
 
