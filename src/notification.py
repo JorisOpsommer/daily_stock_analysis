@@ -1516,7 +1516,7 @@ class NotificationService(
 
                 # ========== 作战计划 ==========
                 battle = dashboard.get("battle_plan", {}) if dashboard else {}
-                if battle:
+                if battle and not self._notification_short:
                     report_lines.extend(
                         [
                             f"### 🎯 {labels['battle_plan_heading']}",
@@ -1530,11 +1530,10 @@ class NotificationService(
                             f"| 🛑 {labels['stop_loss_label']} | {self._clean_sniper_value(sniper.get('stop_loss', 'N/A'))} |",
                             f"| 🎊 {labels['take_profit_label']} | {self._clean_sniper_value(sniper.get('take_profit', 'N/A'))} |",
                         ]
-                        if not self._notification_short:
-                            rows[0:0] = [
-                                f"| 🎯 {labels['ideal_buy_label']} | {self._clean_sniper_value(sniper.get('ideal_buy', 'N/A'))} |",
-                                f"| 🔵 {labels['secondary_buy_label']} | {self._clean_sniper_value(sniper.get('secondary_buy', 'N/A'))} |",
-                            ]
+                        rows[0:0] = [
+                            f"| 🎯 {labels['ideal_buy_label']} | {self._clean_sniper_value(sniper.get('ideal_buy', 'N/A'))} |",
+                            f"| 🔵 {labels['secondary_buy_label']} | {self._clean_sniper_value(sniper.get('secondary_buy', 'N/A'))} |",
+                        ]
                         report_lines.extend(
                             [
                                 f"**📍 {labels['action_points_heading']}**",
@@ -1809,12 +1808,12 @@ class NotificationService(
 
                 # 狙击点位
                 sniper = battle.get("sniper_points", {}) if battle else {}
-                if sniper:
+                if sniper and not self._notification_short:
                     ideal_buy = str(sniper.get("ideal_buy", ""))
                     stop_loss = str(sniper.get("stop_loss", ""))
                     take_profit = str(sniper.get("take_profit", ""))
                     points = []
-                    if ideal_buy and not self._notification_short:
+                    if ideal_buy:
                         points.append(f"🎯{labels['ideal_buy_label']}:{ideal_buy[:15]}")
                     if stop_loss:
                         points.append(f"🛑{labels['stop_loss_label']}:{stop_loss[:15]}")
@@ -2140,12 +2139,11 @@ class NotificationService(
 
         # 狙击点位
         sniper = battle.get("sniper_points", {}) if battle else {}
-        if sniper:
+        if sniper and not self._notification_short:
             headers = []
             cells = []
-            if not self._notification_short:
-                headers.append(str(labels['ideal_buy_label']))
-                cells.append(str(sniper.get("ideal_buy", "-")))
+            headers.append(str(labels['ideal_buy_label']))
+            cells.append(str(sniper.get("ideal_buy", "-")))
             headers.append(str(labels['stop_loss_label']))
             headers.append(str(labels['take_profit_label']))
             cells.append(str(sniper.get("stop_loss", "-")))
