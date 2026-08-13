@@ -1210,23 +1210,6 @@ class NotificationService(
                 return value[len(prefix) :]
         return value
 
-    @staticmethod
-    def _shorten_ma_alignment(value: Any) -> str:
-        """Return a compact MA alignment description for short notifications."""
-        text = str(value or "").strip()
-        if not text:
-            return text
-        for separator in (":", "，", ",", "；", ";"):
-            if separator not in text:
-                continue
-            head = text.split(separator, 1)[0].strip()
-            if head:
-                return head
-        cut = re.search(r"\sMA\d+[<>≥≤=]", text)
-        if cut:
-            return text[: cut.start()].strip()
-        return text
-
     def _append_phase_decision_block(
         self,
         report_lines: list[str],
@@ -1495,10 +1478,6 @@ class NotificationService(
                             else f"❌ {labels['no_label']}"
                         )
                         ma_alignment_text = trend_data.get("ma_alignment", "N/A")
-                        if self._notification_short:
-                            ma_alignment_text = self._shorten_ma_alignment(
-                                ma_alignment_text
-                            )
                         report_lines.extend(
                             [
                                 f"**{labels['ma_alignment_label']}**: {ma_alignment_text} | "
@@ -1508,7 +1487,7 @@ class NotificationService(
                             ]
                         )
                     # 价格位置
-                    if price_data:
+                    if price_data and not self._notification_short:
                         bias_status = price_data.get("bias_status", "N/A")
                         report_lines.extend(
                             [
@@ -1525,7 +1504,7 @@ class NotificationService(
                             ]
                         )
                     # 量能分析
-                    if vol_data:
+                    if vol_data and not self._notification_short:
                         report_lines.extend(
                             [
                                 f"**{labels['volume_label']}**: {labels['volume_ratio_label']} {vol_data.get('volume_ratio', 'N/A')} ({vol_data.get('volume_status', '')}) | "

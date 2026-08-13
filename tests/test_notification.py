@@ -1170,6 +1170,102 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertEqual(out.count("数据缺失，无法判断"), 0)
 
     @mock.patch("src.notification.get_config")
+    def test_dashboard_report_short_notification_keeps_only_ma_alignment_line(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=50,
+            trend_prediction="看空",
+            operation_advice="卖出",
+            analysis_summary="走弱",
+            dashboard={
+                "data_perspective": {
+                    "trend_status": {
+                        "is_bullish": False,
+                        "ma_alignment": "Strong bearish alignment, diverging downward (MA5<MA10<MA20<MA60)",
+                        "trend_score": 10,
+                    },
+                    "price_position": {
+                        "current_price": 18.54,
+                        "ma5": 19.0,
+                        "ma10": 19.87,
+                        "ma20": 20.81,
+                        "bias_ma5": -0.96,
+                        "bias_status": "Price below all key MAs; -9.6% below MA20",
+                        "support_level": 18.4,
+                        "resistance_level": 19.0,
+                    },
+                    "volume_analysis": {
+                        "volume_ratio": 1.2,
+                        "volume_status": "放量",
+                        "turnover_rate": 2.5,
+                        "volume_meaning": "量能放大",
+                    },
+                }
+            },
+        )
+
+        with mock.patch.dict(os.environ, {"NOTIFICATION_SHORT": "true"}, clear=False):
+            service = NotificationService()
+            out = service.generate_dashboard_report([result], report_date="2026-02-01")
+
+        self.assertIn(
+            "**均线排列**: Strong bearish alignment, diverging downward (MA5<MA10<MA20<MA60) | 多头排列: ❌ 否 | 趋势强度: 10/100",
+            out,
+        )
+        self.assertNotIn("价格指标", out)
+        self.assertNotIn("量比", out)
+
+    @mock.patch("src.notification.get_config")
+    def test_dashboard_report_keeps_price_table_when_short_disabled(
+        self, mock_get_config: mock.MagicMock
+    ):
+        mock_get_config.return_value = _make_config(report_renderer_enabled=False)
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            sentiment_score=50,
+            trend_prediction="看空",
+            operation_advice="卖出",
+            analysis_summary="走弱",
+            dashboard={
+                "data_perspective": {
+                    "trend_status": {
+                        "is_bullish": False,
+                        "ma_alignment": "Strong bearish alignment, diverging downward (MA5<MA10<MA20<MA60)",
+                        "trend_score": 10,
+                    },
+                    "price_position": {
+                        "current_price": 18.54,
+                        "ma5": 19.0,
+                        "ma10": 19.87,
+                        "ma20": 20.81,
+                        "bias_ma5": -0.96,
+                        "bias_status": "Price below all key MAs; -9.6% below MA20",
+                        "support_level": 18.4,
+                        "resistance_level": 19.0,
+                    },
+                    "volume_analysis": {
+                        "volume_ratio": 1.2,
+                        "volume_status": "放量",
+                        "turnover_rate": 2.5,
+                        "volume_meaning": "量能放大",
+                    },
+                }
+            },
+        )
+
+        service = NotificationService()
+        out = service.generate_dashboard_report([result], report_date="2026-02-01")
+
+        self.assertIn("| 价格指标 | 当前价 |", out)
+        self.assertIn("| MA5 | 19.0 |", out)
+        self.assertIn("量比", out)
+
+    @mock.patch("src.notification.get_config")
     def test_generate_reports_hide_model_when_disabled(self, mock_get_config: mock.MagicMock):
         mock_get_config.return_value = _make_config(
             report_renderer_enabled=False,
